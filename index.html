@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hospp Roadmap Agent</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -706,7 +709,7 @@ function App(){
             else if(l==='Aguardando')setFilterStatus('pendente');
             else if(l==='Pendente')setFilterStatus('pendente');
             else setFilterStatus('active');
-            setActiveFrente(null);setFilterFeature('all');
+            setActiveFrente(null);
           }}>
             <div style={{fontSize:20,fontWeight:800,color:c}}>{v}</div>
             <div style={{fontSize:9.5,color:'#94a3b8',marginTop:2}}>{l}</div>
@@ -717,7 +720,7 @@ function App(){
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
         <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>Status</span>
         {[['active','Ativos'],['andamento','Em andamento'],['validar','Validar Publicado'],['pendente','Pendente/Aguardando'],['all','Todos']].map(([v,l])=>(
-          <button key={v} onClick={()=>{setFilterStatus(v);setActiveFrente(null);setFilterFeature('all');}}
+          <button key={v} onClick={()=>setFilterStatus(v)}
             style={{padding:'3px 10px',borderRadius:20,fontSize:10.5,fontWeight:700,cursor:'pointer',border:`1.5px solid ${filterStatus===v&&!activeFrente?'#3b82f6':'#e2e8f0'}`,background:filterStatus===v&&!activeFrente?'#3b82f6':'#fff',color:filterStatus===v&&!activeFrente?'#fff':'#64748b',whiteSpace:'nowrap'}}>
             {l}</button>))}
         <div style={{width:1,height:16,background:'#e2e8f0',margin:'0 4px'}}/>
