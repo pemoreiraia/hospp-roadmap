@@ -9,950 +9,738 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,-apple-system,sans-serif;background:#f8fafc;min-height:100vh}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-height:100vh}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
-.rm-row:hover{background:#f8fbff!important}
-.btn{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s}
-.btn-primary{background:#3b82f6;color:#fff;border:none}
-.btn-primary:hover{background:#2563eb}
-.btn-ghost{background:#fff;color:#64748b;border:1.5px solid #e2e8f0}
-.btn-ghost:hover{border-color:#94a3b8;color:#1e293b}
-.btn-active{background:#eff6ff;color:#1d4ed8;border:1.5px solid #3b82f6}
 @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.fade-in{animation:fadeIn .2s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fadeUp .2s ease}
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="text/babel">
-const { useState, useRef, useEffect, useCallback, useMemo } = React;
+const {useState,useRef,useEffect,useCallback,useMemo} = React;
 
 // ─── CONSTANTS ───────────────────────────────────────────────
+const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const CURRENT_MONTH = new Date().getMonth()+1;
+const CURRENT_YEAR  = new Date().getFullYear();
+
+const PIPELINE_MAP = {
+  'Backlog':'Backlog','Pendente Hospp':'Pendente','Correção solicitada(BUG)':'Pendente',
+  'Aguardando estimativa':'Pendente','Aguardando Aprovação Hospp':'Aguardando Aprovação',
+  'Aprovados para Executar (LONGAS)':'Aprovado','Aprovados para Executar (CURTAS)':'Aprovado',
+  'Planejamento da Semana (LONGAS)':'Em andamento','Planejamento da Semana(CURTAS)':'Em andamento',
+  'Em desenvolvimento (LONGAS)':'Em andamento','Em desenvolvimento (CURTAS)':'Em andamento',
+  'Teste interno (ADEKZ)':'Em teste','Reprovados nos Testes Internos':'Em teste',
+  'Liberado para testes (Hospp)':'Em teste','Aguardando homologação':'Em teste',
+  'Testes Homologacao':'Em teste','Reprovado nos Testes Homologação':'Em teste',
+  'Aguardando publicação':'Para publicar','Validar no Publicado':'Validar no Publicado',
+  'Bugs (problemas)':'Em andamento','Reprovado nos Testes Produção':'Para publicar',
+  'Concluído':'Concluído','Cancelado':'Cancelado','StandBy':'StandBy',
+};
+
+const FTR_MAP = {
+  '[FTR] Chamados':'Chamados','[FTR] Cadastros':'Cadastros',
+  '[FTR] Dashboards/Relatórios':'Dashboards & Relatórios','[FTR] Integrações':'Integrações',
+  '[FTR] Arquitetura':'Arquitetura','[FTR] Acessos/Usuários/Perfs':'Acessos & Usuários',
+  '[FTR] Layout':'Layout & UX','[FTR] Segurança':'Segurança','[FTR] IA':'IA',
+  '[FTR] - ZOHO':'Dashboards & Relatórios','[FTR] Licenciamento':'Cadastros',
+  'Bug Funcional':'Bugs','Bug UI/UX':'Bugs','Bug Performance':'Bugs',
+  'Manutenção programada':'Manutenção',
+};
+
+const ACTIVE_STATUSES = new Set(['Pendente','Aguardando Aprovação','Aprovado','Em andamento','Em teste','Para publicar','Validar no Publicado','StandBy','Backlog']);
+
+const FEATURE_ORDER = ['Chamados','Cadastros','Dashboards & Relatórios','Integrações','Bugs','Arquitetura','Acessos & Usuários','Layout & UX','Segurança','IA','Manutenção','Outros'];
+const FEATURE_COLORS = {
+  'Chamados':            {bar:'#3b82f6',soft:'#eff6ff',text:'#1d4ed8',border:'#bfdbfe'},
+  'Cadastros':           {bar:'#8b5cf6',soft:'#f5f3ff',text:'#6d28d9',border:'#ddd6fe'},
+  'Dashboards & Relatórios':{bar:'#f59e0b',soft:'#fffbeb',text:'#b45309',border:'#fde68a'},
+  'Integrações':         {bar:'#10b981',soft:'#ecfdf5',text:'#065f46',border:'#a7f3d0'},
+  'Bugs':                {bar:'#ef4444',soft:'#fef2f2',text:'#b91c1c',border:'#fecaca'},
+  'Arquitetura':         {bar:'#6366f1',soft:'#eef2ff',text:'#4338ca',border:'#c7d2fe'},
+  'Acessos & Usuários':  {bar:'#ec4899',soft:'#fdf2f8',text:'#be185d',border:'#fbcfe8'},
+  'Layout & UX':         {bar:'#14b8a6',soft:'#f0fdfa',text:'#0f766e',border:'#99f6e4'},
+  'Segurança':           {bar:'#dc2626',soft:'#fff1f2',text:'#9f1239',border:'#fecdd3'},
+  'IA':                  {bar:'#7c3aed',soft:'#f5f3ff',text:'#5b21b6',border:'#ddd6fe'},
+  'Manutenção':          {bar:'#64748b',soft:'#f8fafc',text:'#475569',border:'#e2e8f0'},
+  'Outros':              {bar:'#94a3b8',soft:'#f8fafc',text:'#64748b',border:'#e2e8f0'},
+};
+
+const STATUS_STYLE = {
+  'Pendente':              {bg:'#fef9c3',text:'#854d0e',dot:'#eab308'},
+  'Aguardando Aprovação':  {bg:'#fff7ed',text:'#c2410c',dot:'#f97316'},
+  'Aprovado':              {bg:'#eff6ff',text:'#1d4ed8',dot:'#3b82f6'},
+  'Em andamento':          {bg:'#f0fdf4',text:'#166534',dot:'#22c55e'},
+  'Em teste':              {bg:'#f5f3ff',text:'#6d28d9',dot:'#8b5cf6'},
+  'Para publicar':         {bg:'#ecfdf5',text:'#065f46',dot:'#10b981'},
+  'Validar no Publicado':  {bg:'#fef2f2',text:'#b91c1c',dot:'#ef4444'},
+  'StandBy':               {bg:'#f8fafc',text:'#64748b',dot:'#94a3b8'},
+  'Backlog':               {bg:'#f8fafc',text:'#64748b',dot:'#94a3b8'},
+};
+
 const GRUPOS = [
-  { id:1, nome:"Infraestrutura e Base Técnica", cor:"#3b82f6", soft:"#eff6ff", border:"#bfdbfe" },
-  { id:2, nome:"Evolução de Produto",           cor:"#8b5cf6", soft:"#f5f3ff", border:"#ddd6fe" },
-  { id:3, nome:"Operação Corrente",             cor:"#f59e0b", soft:"#fffbeb", border:"#fde68a" },
-  { id:4, nome:"Sustentação",                   cor:"#6b7280", soft:"#f9fafb", border:"#e5e7eb" },
-  { id:5, nome:"Inteligência Artificial",       cor:"#10b981", soft:"#ecfdf5", border:"#a7f3d0" },
+  {id:1,nome:"Infraestrutura e Base Técnica",cor:"#3b82f6",soft:"#eff6ff",border:"#bfdbfe"},
+  {id:2,nome:"Evolução de Produto",          cor:"#8b5cf6",soft:"#f5f3ff",border:"#ddd6fe"},
+  {id:3,nome:"Operação Corrente",            cor:"#f59e0b",soft:"#fffbeb",border:"#fde68a"},
+  {id:4,nome:"Sustentação",                  cor:"#6b7280",soft:"#f9fafb",border:"#e5e7eb"},
+  {id:5,nome:"Inteligência Artificial",      cor:"#10b981",soft:"#ecfdf5",border:"#a7f3d0"},
 ];
 
 const FRENTES_INIT = [
-  { id:"1",  num:1,  grupo:1, prioridade:"ALTA",  risco:"CRITICO", titulo:"Arquitetura e Modelo de Dados",   desc:"Diagnóstico e alterações visando escalabilidade e performance",                dependeDe:[] },
-  { id:"2",  num:2,  grupo:1, prioridade:"ALTA",  risco:"ALTO",    titulo:"Documentação",                    desc:"Verificação, complementação e criação de documentação técnica",             dependeDe:["1"] },
-  { id:"3",  num:3,  grupo:1, prioridade:"ALTA",  risco:"ALTO",    titulo:"Capacity Plan",                   desc:"Diagnóstico e ajustes de performance, simulações de custo",                 dependeDe:["1","2"] },
-  { id:"4",  num:4,  grupo:1, prioridade:"MEDIA", risco:"CRITICO", titulo:"Segurança e Disaster Recovery",   desc:"Diagnóstico e revisão do processo de segurança e DR",                      dependeDe:["1","3"] },
-  { id:"6",  num:6,  grupo:2, prioridade:"BAIXA", risco:"MEDIO",   titulo:"Modernização Stack",              desc:"Validação e planejamento do plano de modernização",                         dependeDe:["1","3"] },
-  { id:"7",  num:7,  grupo:2, prioridade:"ALTA",  risco:"BAIXO",   titulo:"Dashboards Dinâmicos",            desc:"Ferramentas de dashboards integradas com IA",                               dependeDe:["1","3","6","14"] },
-  { id:"8",  num:8,  grupo:2, prioridade:"MEDIA", risco:"MEDIO",   titulo:"Automatização de Testes",         desc:"Implantação de testes automatizados",                                       dependeDe:["1","3"] },
-  { id:"9",  num:9,  grupo:3, prioridade:"ALTA",  risco:"ALTO",    titulo:"Dashboards no Zoho",              desc:"Implementação e manutenção dos dashboards no Zoho",                         dependeDe:[] },
-  { id:"10", num:10, grupo:3, prioridade:"ALTA",  risco:"ALTO",    titulo:"Correção de Bugs",                desc:"Correção de bugs em produção",                                              dependeDe:["1","2","8"] },
-  { id:"11", num:11, grupo:3, prioridade:"ALTA",  risco:"MEDIO",   titulo:"Novas Funcionalidades",           desc:"Novas funcionalidades e adequação a novos produtos",                        dependeDe:["1","2","8"] },
-  { id:"12", num:12, grupo:3, prioridade:"ALTA",  risco:"ALTO",    titulo:"Integração CMMS e Fabricantes",   desc:"Integração com CMMS e plataformas dos fabricantes",                         dependeDe:["1","2","6","8"] },
-  { id:"13", num:13, grupo:4, prioridade:"MEDIA", risco:"ALTO",    titulo:"Suporte e Manutenção",            desc:"Manter e suportar a plataforma",                                            dependeDe:["1","2","6","8"] },
-  { id:"14", num:14, grupo:5, prioridade:"ALTA",  risco:"MEDIO",   titulo:"IA Smart",                        desc:"IA Analítica sobre chamados, base instalada e contratos",                   dependeDe:["1","3"] },
-  { id:"15", num:15, grupo:5, prioridade:"BAIXA", risco:"BAIXO",   titulo:"IA Advanced — Adm",               desc:"IA Preditiva, sugestões de contratos, apoio a CAPEX/OPEX",                  dependeDe:["14"] },
-  { id:"16", num:16, grupo:5, prioridade:"MEDIA", risco:"MEDIO",   titulo:"IA Advanced — Support",           desc:"IA Preditiva com priorização de chamados",                                  dependeDe:["14","15"] },
-  { id:"17", num:17, grupo:5, prioridade:"ALTA",  risco:"ALTO",    titulo:"IA — Higienização de Dados",      desc:"IA para higienizar dados migrados de legados",                              dependeDe:["1","3","10","12"] },
-  { id:"18", num:18, grupo:5, prioridade:"MEDIA", risco:"MEDIO",   titulo:"IA — Co-Piloto Operacional",      desc:"Sugestão de ações em tempo real, entrada assistida",                        dependeDe:["1","14","15","16"] },
+  {id:"1",num:1,grupo:1,prioridade:"ALTA",risco:"CRITICO",titulo:"Arquitetura e Modelo de Dados",desc:"Diagnóstico e alterações visando escalabilidade e performance",dependeDe:[]},
+  {id:"2",num:2,grupo:1,prioridade:"ALTA",risco:"ALTO",titulo:"Documentação",desc:"Verificação, complementação e criação de documentação técnica",dependeDe:["1"]},
+  {id:"3",num:3,grupo:1,prioridade:"ALTA",risco:"ALTO",titulo:"Capacity Plan",desc:"Diagnóstico e ajustes de performance, simulações de custo",dependeDe:["1","2"]},
+  {id:"4",num:4,grupo:1,prioridade:"MEDIA",risco:"CRITICO",titulo:"Segurança e Disaster Recovery",desc:"Diagnóstico e revisão do processo de segurança e DR",dependeDe:["1","3"]},
+  {id:"6",num:6,grupo:2,prioridade:"BAIXA",risco:"MEDIO",titulo:"Modernização Stack",desc:"Validação e planejamento do plano de modernização",dependeDe:["1","3"]},
+  {id:"7",num:7,grupo:2,prioridade:"ALTA",risco:"BAIXO",titulo:"Dashboards Dinâmicos",desc:"Ferramentas de dashboards integradas com IA",dependeDe:["1","3","6","14"]},
+  {id:"8",num:8,grupo:2,prioridade:"MEDIA",risco:"MEDIO",titulo:"Automatização de Testes",desc:"Implantação de testes automatizados",dependeDe:["1","3"]},
+  {id:"9",num:9,grupo:3,prioridade:"ALTA",risco:"ALTO",titulo:"Dashboards no Zoho",desc:"Implementação e manutenção dos dashboards no Zoho",dependeDe:[]},
+  {id:"10",num:10,grupo:3,prioridade:"ALTA",risco:"ALTO",titulo:"Correção de Bugs",desc:"Correção de bugs em produção",dependeDe:["1","2","8"]},
+  {id:"11",num:11,grupo:3,prioridade:"ALTA",risco:"MEDIO",titulo:"Novas Funcionalidades",desc:"Novas funcionalidades e adequação a novos produtos",dependeDe:["1","2","8"]},
+  {id:"12",num:12,grupo:3,prioridade:"ALTA",risco:"ALTO",titulo:"Integração CMMS e Fabricantes",desc:"Integração com CMMS e plataformas dos fabricantes",dependeDe:["1","2","6","8"]},
+  {id:"13",num:13,grupo:4,prioridade:"MEDIA",risco:"ALTO",titulo:"Suporte e Manutenção",desc:"Manter e suportar a plataforma",dependeDe:["1","2","6","8"]},
+  {id:"14",num:14,grupo:5,prioridade:"ALTA",risco:"MEDIO",titulo:"IA Smart",desc:"IA Analítica sobre chamados, base instalada e contratos",dependeDe:["1","3"]},
+  {id:"15",num:15,grupo:5,prioridade:"BAIXA",risco:"BAIXO",titulo:"IA Advanced — Adm",desc:"IA Preditiva, sugestões de contratos, apoio a CAPEX/OPEX",dependeDe:["14"]},
+  {id:"16",num:16,grupo:5,prioridade:"MEDIA",risco:"MEDIO",titulo:"IA Advanced — Support",desc:"IA Preditiva com priorização de chamados",dependeDe:["14","15"]},
+  {id:"17",num:17,grupo:5,prioridade:"ALTA",risco:"ALTO",titulo:"IA — Higienização de Dados",desc:"IA para higienizar dados migrados de legados",dependeDe:["1","3","10","12"]},
+  {id:"18",num:18,grupo:5,prioridade:"MEDIA",risco:"MEDIO",titulo:"IA — Co-Piloto Operacional",desc:"Sugestão de ações em tempo real, entrada assistida",dependeDe:["1","14","15","16"]},
 ];
 
-const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-const CURRENT_MONTH = new Date().getMonth() + 1;
-
-const RISCO_S = {
-  CRITICO: { bg:"#fef2f2", text:"#dc2626", dot:"#ef4444" },
-  ALTO:    { bg:"#fff7ed", text:"#c2410c", dot:"#f97316" },
-  MEDIO:   { bg:"#fefce8", text:"#a16207", dot:"#eab308" },
-  BAIXO:   { bg:"#f0fdf4", text:"#15803d", dot:"#22c55e" },
-};
-const PRIOR_S = {
-  ALTA:  { bg:"#fee2e2", text:"#b91c1c" },
-  MEDIA: { bg:"#fef9c3", text:"#854d0e" },
-  BAIXA: { bg:"#f0fdf4", text:"#166534" },
-};
-const BAR_COLORS = { critical:"#ef4444", high:"#f97316", medium:"#3b82f6", low:"#94a3b8" };
-const SRC_S = {
-  trello: { bg:"#eff6ff", text:"#1d4ed8", border:"#bfdbfe", label:"Trello" },
-  manual: { bg:"#f5f3ff", text:"#6d28d9", border:"#ddd6fe", label:"Manual" },
-};
+const RISCO_S={CRITICO:{bg:"#fef2f2",text:"#dc2626",dot:"#ef4444"},ALTO:{bg:"#fff7ed",text:"#c2410c",dot:"#f97316"},MEDIO:{bg:"#fefce8",text:"#a16207",dot:"#eab308"},BAIXO:{bg:"#f0fdf4",text:"#15803d",dot:"#22c55e"}};
+const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const LS = {
-  get: (k, def) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch { return def; } },
-  set: (k, v)  => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+const APP_VERSION = "2.0";
+const LS={
+  get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
 };
 
+// Version check — if old data, clear trello cache so user reimports with new parser
+(()=>{
+  const storedVersion = LS.get('hospp:version', null);
+  if(storedVersion !== APP_VERSION){
+    // Check if old format: old data had group=listName, new has feature=featureArea
+    const oldData = LS.get('hospp:trello', []);
+    const hasOldFormat = oldData.length > 0 && oldData[0] && !oldData[0].feature;
+    if(hasOldFormat){
+      localStorage.removeItem('hospp:trello');
+      localStorage.removeItem('hospp:boardName');
+      // Keep overlay and frentes — they are still valid
+    }
+    LS.set('hospp:version', APP_VERSION);
+  }
+})();
+
 // ─── TRELLO PARSER ───────────────────────────────────────────
-function parseTrelloJSON(json) {
-  const board = typeof json === "string" ? JSON.parse(json) : json;
-  const lists = {};
-  (board.lists || []).forEach(l => { lists[l.id] = l.name; });
-
-  const PRIORITY_MAP = { "[PRI] Crítica":"critical", "[PRI] Alta":"high", "[PRI] Média":"medium", "[PRI] Baixa":"low" };
-  const GROUP_MAP = {};
-
-  return (board.cards || [])
-    .filter(c => !c.closed && !c.archived)
-    .map(c => {
-      const labels = (c.labels || []).map(l => l.name || "");
-      let priority = "medium";
-      let group = lists[c.idList] || "Backlog";
-
-      labels.forEach(l => {
-        if (PRIORITY_MAP[l]) priority = PRIORITY_MAP[l];
-        if (l.startsWith("[FTR]")) group = l.replace("[FTR]","").trim();
-      });
-
-      // Try to infer group from list name
-      const listName = lists[c.idList] || "";
-      if (!GROUP_MAP[c.idList]) group = listName;
-
-      return {
-        id: `trello-${c.id}`,
-        source: "trello",
-        title: c.name,
-        description: c.desc || "",
-        group,
-        priority,
-        startMonth: 1,
-        endMonth: 2,
-        trelloUrl: c.shortUrl || c.url || "",
-        labels,
-        listName,
-      };
-    });
+function parseTrello(json){
+  const board=typeof json==='string'?JSON.parse(json):json;
+  const lists={};
+  (board.lists||[]).forEach(l=>{lists[l.id]=l.name;});
+  return (board.cards||[]).filter(c=>!c.closed).map(c=>{
+    const labels=(c.labels||[]).map(l=>l.name||'');
+    const listName=lists[c.idList]||'';
+    const status=PIPELINE_MAP[listName]||'Outros';
+    let feature='Outros';
+    for(const lbl of labels){if(FTR_MAP[lbl]){feature=FTR_MAP[lbl];break;}}
+    if(feature==='Outros'&&labels.some(l=>l.includes('Bug')))feature='Bugs';
+    const isPriority=labels.includes('PRIORIDADE')||labels.includes('[PRI] Demanda de Cliente');
+    const isRedor=labels.includes("[PRI] Integrações Rede D'Or");
+    return {
+      id:'t-'+c.id, source:'trello', title:c.name, feature, status,
+      active:ACTIVE_STATUSES.has(status), url:c.shortUrl||'',
+      priority:isPriority?'high':'medium', isRedor,
+      startMonth:CURRENT_MONTH, endMonth:Math.min(12,CURRENT_MONTH+1),
+      group:feature, listName,
+    };
+  });
 }
 
 // ─── ARROW LAYER ─────────────────────────────────────────────
-function Arrows({ frentes, refs, show, hov }) {
-  const [paths, setPaths] = useState([]);
-
-  const compute = useCallback(() => {
-    if (!show) { setPaths([]); return; }
-    const cont = document.querySelector(".fb-scroll");
-    if (!cont) return;
-    const cr = cont.getBoundingClientRect();
-    const sl = cont.scrollLeft, st = cont.scrollTop;
-    const res = [];
-    frentes.forEach(f => f.dependeDe.forEach(dep => {
-      const a = refs.current[dep], b = refs.current[f.id];
-      if (!a || !b) return;
-      const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
-      res.push({
-        fid: dep, tid: f.id,
-        x1: ar.right - cr.left + sl, y1: ar.top + ar.height / 2 - cr.top + st,
-        x2: br.left  - cr.left + sl, y2: br.top + br.height / 2 - cr.top + st,
-      });
+function Arrows({frentes,refs,show,hov}){
+  const [paths,setPaths]=useState([]);
+  const compute=useCallback(()=>{
+    if(!show){setPaths([]);return;}
+    const cont=document.querySelector('.fb-scroll');
+    if(!cont)return;
+    const cr=cont.getBoundingClientRect(),sl=cont.scrollLeft,st=cont.scrollTop;
+    const res=[];
+    frentes.forEach(f=>f.dependeDe.forEach(dep=>{
+      const a=refs.current[dep],b=refs.current[f.id];
+      if(!a||!b)return;
+      const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect();
+      res.push({fid:dep,tid:f.id,x1:ar.right-cr.left+sl,y1:ar.top+ar.height/2-cr.top+st,x2:br.left-cr.left+sl,y2:br.top+br.height/2-cr.top+st});
     }));
     setPaths(res);
-  }, [frentes, show, refs]);
-
-  useEffect(() => {
-    const timer = setTimeout(compute, 80);
-    window.addEventListener("resize", compute);
-    return () => { clearTimeout(timer); window.removeEventListener("resize", compute); };
-  }, [compute]);
-
-  if (!show || !paths.length) return null;
-
-  return (
-    <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:10,overflow:"visible"}}>
-      <defs>
-        {[["n","#94a3b8"],["f","#3b82f6"],["t","#f59e0b"]].map(([k,c]) => (
-          <marker key={k} id={`m${k}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-            <path d="M0,0 L0,6 L8,3 z" fill={c}/>
-          </marker>
-        ))}
-      </defs>
-      {paths.map((p, i) => {
-        const hf = hov === p.fid, ht = hov === p.tid, hi = hf || ht;
-        const dx = Math.abs(p.x2 - p.x1) * 0.4;
-        return (
-          <path key={i}
-            d={`M${p.x1},${p.y1} C${p.x1+dx},${p.y1} ${p.x2-dx},${p.y2} ${p.x2},${p.y2}`}
-            fill="none"
-            stroke={hf ? "#3b82f6" : ht ? "#f59e0b" : "#cbd5e1"}
-            strokeWidth={hi ? 2 : 1}
-            strokeDasharray={hi ? "none" : "4 3"}
-            markerEnd={hf ? "url(#mf)" : ht ? "url(#mt)" : "url(#mn)"}
-            opacity={hi ? 1 : 0.45}
-            style={{transition:"stroke .15s,opacity .15s"}}
-          />
-        );
-      })}
-    </svg>
-  );
+  },[frentes,show,refs]);
+  useEffect(()=>{const t=setTimeout(compute,80);window.addEventListener('resize',compute);return()=>{clearTimeout(t);window.removeEventListener('resize',compute);};},[compute]);
+  if(!show||!paths.length)return null;
+  return(<svg style={{position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none',zIndex:10,overflow:'visible'}}>
+    <defs>{[['n','#94a3b8'],['f','#3b82f6'],['t','#f59e0b']].map(([k,c])=>(
+      <marker key={k} id={`m${k}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill={c}/></marker>
+    ))}</defs>
+    {paths.map((p,i)=>{
+      const hf=hov===p.fid,ht=hov===p.tid,hi=hf||ht,dx=Math.abs(p.x2-p.x1)*0.4;
+      return<path key={i} d={`M${p.x1},${p.y1} C${p.x1+dx},${p.y1} ${p.x2-dx},${p.y2} ${p.x2},${p.y2}`}
+        fill="none" stroke={hf?'#3b82f6':ht?'#f59e0b':'#cbd5e1'} strokeWidth={hi?2:1}
+        strokeDasharray={hi?'none':'4 3'} markerEnd={hf?'url(#mf)':ht?'url(#mt)':'url(#mn)'} opacity={hi?1:0.45}
+        style={{transition:'stroke .15s,opacity .15s'}}/>;
+    })}
+  </svg>);
 }
 
 // ─── FRENTE CARD ─────────────────────────────────────────────
-function FCard({ f, g, all, refs, hov, setHov, onEdit, onDel, onDrill, dragH }) {
-  const rs = RISCO_S[f.risco] || RISCO_S.MEDIO;
-  const ps = PRIOR_S[f.prioridade] || PRIOR_S.MEDIA;
-  const isH = hov === f.id;
-  const isDep = f.dependeDe.includes(hov || "") ||
-    all.some(x => x.id === hov && x.dependeDe.includes(f.id));
-
-  return (
-    <div
-      ref={el => refs.current[f.id] = el}
-      draggable {...dragH(f)}
-      onMouseEnter={() => setHov(f.id)}
-      onMouseLeave={() => setHov(null)}
-      style={{
-        background:"#fff",
-        border:`1.5px solid ${isH ? g.cor : isDep ? "#c7d2fe" : "#e2e8f0"}`,
-        borderRadius:10, padding:"10px 12px", cursor:"grab", userSelect:"none", position:"relative",
-        boxShadow: isH ? `0 4px 16px ${g.cor}30` : isDep ? "0 2px 8px #6366f120" : "0 1px 3px #0001",
-        transition:"all .15s",
-      }}
-    >
-      <div style={{display:"flex",gap:8,marginBottom:7}}>
-        <div style={{width:26,height:26,borderRadius:7,background:g.cor,color:"#fff",fontWeight:800,fontSize:11,
-          display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{f.num}</div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:700,fontSize:12.5,color:"#1e293b",lineHeight:1.3}}>{f.titulo}</div>
-          <div style={{fontSize:10.5,color:"#64748b",marginTop:2,lineHeight:1.4,
-            display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{f.desc}</div>
-        </div>
-      </div>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:f.dependeDe.length?6:0}}>
-        <span style={{fontSize:9.5,fontWeight:700,padding:"2px 6px",borderRadius:20,background:ps.bg,color:ps.text}}>{f.prioridade}</span>
-        <span style={{fontSize:9.5,fontWeight:700,padding:"2px 6px",borderRadius:20,background:rs.bg,color:rs.text,
-          display:"flex",alignItems:"center",gap:3}}>
-          <span style={{width:4,height:4,borderRadius:"50%",background:rs.dot,display:"inline-block"}}/>
-          {f.risco}
-        </span>
-      </div>
-      {f.dependeDe.length > 0 && (
-        <div style={{fontSize:9.5,color:"#94a3b8",borderTop:"1px solid #f1f5f9",paddingTop:5}}>
-          <span style={{color:"#64748b",fontWeight:600}}>Dep: </span>
-          {f.dependeDe.map(d => `#${d}`).join(", ")}
-        </div>
-      )}
-      <div style={{position:"absolute",top:7,right:7,display:"flex",gap:3,opacity:isH?1:0,transition:"opacity .15s"}}>
-        <button onClick={() => onDrill(f)} title="Detalhes / Roadmap"
-          style={{width:22,height:22,borderRadius:5,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:11,color:"#1e293b",
-          display:"flex",alignItems:"center",justifyContent:"center"}}>↗</button>
-        <button onClick={() => onEdit(f)} title="Editar"
-          style={{width:22,height:22,borderRadius:5,border:"1px solid #e2e8f0",background:"#fff",cursor:"pointer",fontSize:11,color:"#1e293b",
-          display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
-        <button onClick={() => onDel(f.id)} title="Remover"
-          style={{width:22,height:22,borderRadius:5,border:"1px solid #fee2e2",background:"#fff",cursor:"pointer",fontSize:11,color:"#ef4444",
-          display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+function FCard({f,g,all,refs,hov,setHov,onEdit,onDel,onDrill,dragH}){
+  const rs=RISCO_S[f.risco]||RISCO_S.MEDIO,ps=PRIOR_S[f.prioridade]||PRIOR_S.MEDIA;
+  const isH=hov===f.id,isDep=f.dependeDe.includes(hov||'')||all.some(x=>x.id===hov&&x.dependeDe.includes(f.id));
+  return(<div ref={el=>refs.current[f.id]=el} draggable {...dragH(f)}
+    onMouseEnter={()=>setHov(f.id)} onMouseLeave={()=>setHov(null)}
+    style={{background:'#fff',border:`1.5px solid ${isH?g.cor:isDep?'#c7d2fe':'#e2e8f0'}`,borderRadius:10,padding:'10px 12px',cursor:'grab',userSelect:'none',position:'relative',boxShadow:isH?`0 4px 16px ${g.cor}30`:isDep?'0 2px 8px #6366f120':'0 1px 3px #0001',transition:'all .15s'}}>
+    <div style={{display:'flex',gap:8,marginBottom:7}}>
+      <div style={{width:26,height:26,borderRadius:7,background:g.cor,color:'#fff',fontWeight:800,fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{f.num}</div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontWeight:700,fontSize:12.5,color:'#1e293b',lineHeight:1.3}}>{f.titulo}</div>
+        <div style={{fontSize:10.5,color:'#64748b',marginTop:2,lineHeight:1.4,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{f.desc}</div>
       </div>
     </div>
-  );
+    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:f.dependeDe.length?6:0}}>
+      <span style={{fontSize:9.5,fontWeight:700,padding:'2px 6px',borderRadius:20,background:ps.bg,color:ps.text}}>{f.prioridade}</span>
+      <span style={{fontSize:9.5,fontWeight:700,padding:'2px 6px',borderRadius:20,background:rs.bg,color:rs.text,display:'flex',alignItems:'center',gap:3}}>
+        <span style={{width:4,height:4,borderRadius:'50%',background:rs.dot,display:'inline-block'}}/>{f.risco}
+      </span>
+    </div>
+    {f.dependeDe.length>0&&<div style={{fontSize:9.5,color:'#94a3b8',borderTop:'1px solid #f1f5f9',paddingTop:5}}>
+      <span style={{color:'#64748b',fontWeight:600}}>Dep: </span>{f.dependeDe.map(d=>`#${d}`).join(', ')}
+    </div>}
+    <div style={{position:'absolute',top:7,right:7,display:'flex',gap:3,opacity:isH?1:0,transition:'opacity .15s'}}>
+      <button onClick={()=>onDrill(f)} style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>↗</button>
+      <button onClick={()=>onEdit(f)} style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>✎</button>
+      <button onClick={()=>onDel(f.id)} style={{width:22,height:22,borderRadius:5,border:'1px solid #fee2e2',background:'#fff',cursor:'pointer',fontSize:11,color:'#ef4444',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+    </div>
+  </div>);
 }
 
 // ─── EDIT MODAL ──────────────────────────────────────────────
-function EditModal({ f, all, onSave, onClose }) {
-  const isNew = !f.id;
-  const [form, setForm] = useState({ titulo:"", desc:"", grupo:1, prioridade:"ALTA", risco:"ALTO", dependeDe:[], ...f });
-  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const tog = id => set("dependeDe", form.dependeDe.includes(id)
-    ? form.dependeDe.filter(d => d !== id) : [...form.dependeDe, id]);
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"#00000066",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:"#fff",borderRadius:16,width:"100%",maxWidth:540,maxHeight:"88vh",overflow:"auto",boxShadow:"0 20px 60px #0003"}}>
-        <div style={{padding:"18px 22px 14px",borderBottom:"1px solid #f1f5f9",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <h2 style={{fontSize:15,fontWeight:800,color:"#1e293b",margin:0}}>{isNew?"Nova Frente":"Editar Frente"}</h2>
-          <button onClick={onClose} style={{border:"none",background:"none",fontSize:20,cursor:"pointer",color:"#94a3b8"}}>×</button>
-        </div>
-        <div style={{padding:"14px 22px",display:"flex",flexDirection:"column",gap:12}}>
-          <div>
-            <label style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",display:"block",marginBottom:3}}>Título *</label>
-            <input value={form.titulo} onChange={e => set("titulo", e.target.value)}
-              style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"7px 11px",fontSize:13,outline:"none"}}/>
-          </div>
-          <div>
-            <label style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",display:"block",marginBottom:3}}>Descrição</label>
-            <textarea value={form.desc} onChange={e => set("desc", e.target.value)} rows={2}
-              style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"7px 11px",fontSize:13,outline:"none",resize:"vertical"}}/>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-            {[
-              ["Grupo",      "grupo",      GRUPOS.map(g => ({ v:g.id, l:`G${g.id}` }))],
-              ["Prioridade", "prioridade", ["ALTA","MEDIA","BAIXA"].map(v => ({ v, l:v }))],
-              ["Risco",      "risco",      ["CRITICO","ALTO","MEDIO","BAIXO"].map(v => ({ v, l:v }))],
-            ].map(([lbl, key, opts]) => (
-              <div key={key}>
-                <label style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",display:"block",marginBottom:3}}>{lbl}</label>
-                <select value={form[key]} onChange={e => set(key, key==="grupo" ? Number(e.target.value) : e.target.value)}
-                  style={{width:"100%",border:"1.5px solid #e2e8f0",borderRadius:8,padding:"6px 9px",fontSize:11}}>
-                  {opts.map(o => <option key={String(o.v)} value={o.v}>{o.l}</option>)}
-                </select>
-              </div>
-            ))}
-          </div>
-          <div>
-            <label style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",display:"block",marginBottom:5}}>Depende de</label>
-            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-              {all.filter(x => x.id !== form.id).map(x => {
-                const sel = form.dependeDe.includes(x.id);
-                return (
-                  <button key={x.id} onClick={() => tog(x.id)}
-                    style={{padding:"3px 9px",borderRadius:20,fontSize:10.5,fontWeight:600,cursor:"pointer",
-                      border: sel ? "1.5px solid #3b82f6" : "1.5px solid #e2e8f0",
-                      background: sel ? "#eff6ff" : "#fff", color: sel ? "#1d4ed8" : "#64748b"}}>
-                    #{x.num} {x.titulo.slice(0,18)}{x.titulo.length>18?"…":""}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-        <div style={{padding:"10px 22px 18px",display:"flex",justifyContent:"flex-end",gap:8,borderTop:"1px solid #f1f5f9"}}>
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" onClick={() => {
-            if (!form.titulo.trim()) return alert("Título obrigatório");
-            onSave(form); onClose();
-          }}>{isNew ? "Criar" : "Salvar"}</button>
-        </div>
+function EditModal({f,all,onSave,onClose}){
+  const isNew=!f.id;
+  const [form,setForm]=useState({titulo:'',desc:'',grupo:1,prioridade:'ALTA',risco:'ALTO',dependeDe:[],...f});
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const tog=id=>set('dependeDe',form.dependeDe.includes(id)?form.dependeDe.filter(d=>d!==id):[...form.dependeDe,id]);
+  return(<div style={{position:'fixed',inset:0,background:'#00000066',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+    <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:540,maxHeight:'88vh',overflow:'auto',boxShadow:'0 20px 60px #0003'}}>
+      <div style={{padding:'18px 22px 14px',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <h2 style={{fontSize:15,fontWeight:800,color:'#1e293b',margin:0}}>{isNew?'Nova Frente':'Editar Frente'}</h2>
+        <button onClick={onClose} style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:'#94a3b8'}}>×</button>
+      </div>
+      <div style={{padding:'14px 22px',display:'flex',flexDirection:'column',gap:12}}>
+        <div><label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Título *</label>
+          <input value={form.titulo} onChange={e=>set('titulo',e.target.value)} style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 11px',fontSize:13,outline:'none'}}/></div>
+        <div><label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Descrição</label>
+          <textarea value={form.desc} onChange={e=>set('desc',e.target.value)} rows={2} style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 11px',fontSize:13,outline:'none',resize:'vertical'}}/></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+          {[['Grupo','grupo',GRUPOS.map(g=>({v:g.id,l:`G${g.id}`}))],['Prioridade','prioridade',['ALTA','MEDIA','BAIXA'].map(v=>({v,l:v}))],['Risco','risco',['CRITICO','ALTO','MEDIO','BAIXO'].map(v=>({v,l:v}))]].map(([lbl,key,opts])=>(
+            <div key={key}><label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>{lbl}</label>
+              <select value={form[key]} onChange={e=>set(key,key==='grupo'?Number(e.target.value):e.target.value)} style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'6px 9px',fontSize:11}}>
+                {opts.map(o=><option key={String(o.v)} value={o.v}>{o.l}</option>)}</select></div>
+          ))}</div>
+        <div><label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:5}}>Depende de</label>
+          <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+            {all.filter(x=>x.id!==form.id).map(x=>{const sel=form.dependeDe.includes(x.id);return(
+              <button key={x.id} onClick={()=>tog(x.id)} style={{padding:'3px 9px',borderRadius:20,fontSize:10.5,fontWeight:600,cursor:'pointer',border:sel?'1.5px solid #3b82f6':'1.5px solid #e2e8f0',background:sel?'#eff6ff':'#fff',color:sel?'#1d4ed8':'#64748b'}}>
+                #{x.num} {x.titulo.slice(0,18)}{x.titulo.length>18?'…':''}</button>);})}
+          </div></div>
+      </div>
+      <div style={{padding:'10px 22px 18px',display:'flex',justifyContent:'flex-end',gap:8,borderTop:'1px solid #f1f5f9'}}>
+        <button onClick={onClose} style={{padding:'7px 16px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',fontWeight:600,cursor:'pointer',fontSize:12}}>Cancelar</button>
+        <button onClick={()=>{if(!form.titulo.trim())return alert('Título obrigatório');onSave(form);onClose();}} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#3b82f6',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:12}}>{isNew?'Criar':'Salvar'}</button>
       </div>
     </div>
-  );
+  </div>);
 }
 
-// ─── DRILL DOWN PANEL ────────────────────────────────────────
-function DrillPanel({ f, all, onClose, onOpenRoadmap }) {
-  const g = GRUPOS.find(x => x.id === f.grupo) || GRUPOS[0];
-  const rs = RISCO_S[f.risco] || RISCO_S.MEDIO;
-  const deps = f.dependeDe.map(id => all.find(x => x.id === id)).filter(Boolean);
-  const blocks = all.filter(x => x.dependeDe.includes(f.id));
-
-  return (
-    <div style={{position:"fixed",inset:0,background:"#00000055",zIndex:150,display:"flex",justifyContent:"flex-end"}}
-      onClick={onClose}>
-      <div onClick={e => e.stopPropagation()}
-        style={{width:"min(560px,100%)",height:"100vh",background:"#fff",
-          boxShadow:"-8px 0 40px #0002",display:"flex",flexDirection:"column",
-          animation:"slideIn .2s ease"}}>
-        <div style={{padding:"22px 22px 16px",borderBottom:"1px solid #f1f5f9"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-            <div style={{width:34,height:34,borderRadius:9,background:g.cor,color:"#fff",fontWeight:800,fontSize:15,
-              display:"flex",alignItems:"center",justifyContent:"center"}}>{f.num}</div>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:800,fontSize:15,color:"#1e293b"}}>{f.titulo}</div>
-              <div style={{fontSize:11,color:g.cor,fontWeight:600}}>Grupo {g.id} — {g.nome}</div>
-            </div>
-            <button onClick={onClose}
-              style={{border:"none",background:"none",fontSize:22,cursor:"pointer",color:"#94a3b8"}}>×</button>
-          </div>
-          <p style={{fontSize:13,color:"#475569",lineHeight:1.6,margin:0}}>{f.desc}</p>
+// ─── DRILL PANEL (Frentes) ───────────────────────────────────
+function DrillPanel({f,all,onClose,onOpenRoadmap}){
+  const g=GRUPOS.find(x=>x.id===f.grupo)||GRUPOS[0];
+  const rs=RISCO_S[f.risco]||RISCO_S.MEDIO;
+  const deps=f.dependeDe.map(id=>all.find(x=>x.id===id)).filter(Boolean);
+  const blocks=all.filter(x=>x.dependeDe.includes(f.id));
+  return(<div style={{position:'fixed',inset:0,background:'#00000055',zIndex:150,display:'flex',justifyContent:'flex-end'}} onClick={onClose}>
+    <div onClick={e=>e.stopPropagation()} style={{width:'min(560px,100%)',height:'100vh',background:'#fff',boxShadow:'-8px 0 40px #0002',display:'flex',flexDirection:'column',animation:'slideIn .2s ease'}}>
+      <div style={{padding:'22px 22px 16px',borderBottom:'1px solid #f1f5f9'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+          <div style={{width:34,height:34,borderRadius:9,background:g.cor,color:'#fff',fontWeight:800,fontSize:15,display:'flex',alignItems:'center',justifyContent:'center'}}>{f.num}</div>
+          <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:'#1e293b'}}>{f.titulo}</div><div style={{fontSize:11,color:g.cor,fontWeight:600}}>Grupo {g.id} — {g.nome}</div></div>
+          <button onClick={onClose} style={{border:'none',background:'none',fontSize:22,cursor:'pointer',color:'#94a3b8'}}>×</button>
         </div>
-
-        <div style={{padding:"12px 22px",borderBottom:"1px solid #f1f5f9",display:"flex",gap:8}}>
-          {[
-            ["Prioridade", f.prioridade, PRIOR_S[f.prioridade] || PRIOR_S.MEDIA],
-            ["Risco",      f.risco,      rs],
-            ["Depende de", `${f.dependeDe.length} frentes`, {bg:"#f8fafc",text:"#1e293b"}],
-          ].map(([lbl, val, sty]) => (
-            <div key={lbl} style={{flex:1,padding:"8px 12px",borderRadius:8,background:sty.bg}}>
-              <div style={{fontSize:9.5,fontWeight:700,color:"#64748b",textTransform:"uppercase"}}>{lbl}</div>
-              <div style={{fontSize:14,fontWeight:800,color:sty.text,marginTop:2}}>{val}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{padding:"14px 22px",flex:1,overflow:"auto"}}>
-          {deps.length > 0 && (
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:7}}>
-                Depende de ({deps.length})
-              </div>
-              {deps.map(d => {
-                const dg = GRUPOS.find(x => x.id === d.grupo) || GRUPOS[0];
-                return (
-                  <div key={d.id} style={{display:"flex",alignItems:"center",gap:7,padding:"7px 11px",
-                    borderRadius:8,background:"#f8fafc",marginBottom:4,border:"1px solid #e2e8f0"}}>
-                    <span style={{width:20,height:20,borderRadius:5,background:dg.cor,color:"#fff",
-                      fontWeight:800,fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{d.num}</span>
-                    <span style={{fontSize:12.5,color:"#1e293b"}}>{d.titulo}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {blocks.length > 0 && (
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:10,fontWeight:700,color:"#64748b",textTransform:"uppercase",marginBottom:7}}>
-                Bloqueia ({blocks.length})
-              </div>
-              {blocks.map(d => {
-                const dg = GRUPOS.find(x => x.id === d.grupo) || GRUPOS[0];
-                return (
-                  <div key={d.id} style={{display:"flex",alignItems:"center",gap:7,padding:"7px 11px",
-                    borderRadius:8,background:"#fff7ed",marginBottom:4,border:"1px solid #fde68a"}}>
-                    <span style={{width:20,height:20,borderRadius:5,background:dg.cor,color:"#fff",
-                      fontWeight:800,fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{d.num}</span>
-                    <span style={{fontSize:12.5,color:"#1e293b"}}>{d.titulo}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div style={{borderRadius:12,border:"2px dashed #e2e8f0",padding:"22px 18px",textAlign:"center"}}>
-            <div style={{fontSize:28,marginBottom:8}}>📋</div>
-            <div style={{fontWeight:700,fontSize:14,color:"#1e293b",marginBottom:5}}>Roadmap desta Frente</div>
-            <div style={{fontSize:12,color:"#94a3b8",lineHeight:1.6,marginBottom:14}}>
-              Ver todos os cards do Trello e itens<br/>relacionados a <strong>{f.titulo}</strong>
-            </div>
-            <button className="btn btn-primary" onClick={() => onOpenRoadmap(f)}>
-              Abrir Roadmap →
-            </button>
-          </div>
+        <p style={{fontSize:13,color:'#475569',lineHeight:1.6,margin:0}}>{f.desc}</p>
+      </div>
+      <div style={{padding:'12px 22px',borderBottom:'1px solid #f1f5f9',display:'flex',gap:8}}>
+        {[['Prioridade',f.prioridade,PRIOR_S[f.prioridade]||PRIOR_S.MEDIA],['Risco',f.risco,rs],['Depende de',`${f.dependeDe.length} frentes`,{bg:'#f8fafc',text:'#1e293b'}]].map(([lbl,val,sty])=>(
+          <div key={lbl} style={{flex:1,padding:'8px 12px',borderRadius:8,background:sty.bg}}>
+            <div style={{fontSize:9.5,fontWeight:700,color:'#64748b',textTransform:'uppercase'}}>{lbl}</div>
+            <div style={{fontSize:14,fontWeight:800,color:sty.text,marginTop:2}}>{val}</div>
+          </div>))}
+      </div>
+      <div style={{padding:'14px 22px',flex:1,overflow:'auto'}}>
+        {deps.length>0&&<div style={{marginBottom:16}}>
+          <div style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',marginBottom:7}}>Depende de ({deps.length})</div>
+          {deps.map(d=>{const dg=GRUPOS.find(x=>x.id===d.grupo)||GRUPOS[0];return(
+            <div key={d.id} style={{display:'flex',alignItems:'center',gap:7,padding:'7px 11px',borderRadius:8,background:'#f8fafc',marginBottom:4,border:'1px solid #e2e8f0'}}>
+              <span style={{width:20,height:20,borderRadius:5,background:dg.cor,color:'#fff',fontWeight:800,fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{d.num}</span>
+              <span style={{fontSize:12.5,color:'#1e293b'}}>{d.titulo}</span>
+            </div>);})}
+        </div>}
+        {blocks.length>0&&<div style={{marginBottom:16}}>
+          <div style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',marginBottom:7}}>Bloqueia ({blocks.length})</div>
+          {blocks.map(d=>{const dg=GRUPOS.find(x=>x.id===d.grupo)||GRUPOS[0];return(
+            <div key={d.id} style={{display:'flex',alignItems:'center',gap:7,padding:'7px 11px',borderRadius:8,background:'#fff7ed',marginBottom:4,border:'1px solid #fde68a'}}>
+              <span style={{width:20,height:20,borderRadius:5,background:dg.cor,color:'#fff',fontWeight:800,fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{d.num}</span>
+              <span style={{fontSize:12.5,color:'#1e293b'}}>{d.titulo}</span>
+            </div>);})}
+        </div>}
+        <div style={{borderRadius:12,border:'2px dashed #e2e8f0',padding:'22px 18px',textAlign:'center'}}>
+          <div style={{fontWeight:700,fontSize:14,color:'#1e293b',marginBottom:5}}>Roadmap desta Frente</div>
+          <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6,marginBottom:14}}>Ver cards do Trello relacionados a <strong>{f.titulo}</strong></div>
+          <button onClick={()=>onOpenRoadmap(f)} style={{padding:'8px 18px',borderRadius:8,background:g.cor,color:'#fff',fontWeight:700,fontSize:12,border:'none',cursor:'pointer'}}>Abrir Roadmap →</button>
         </div>
       </div>
     </div>
-  );
+  </div>);
+}
+
+// ─── CARD DETAIL PANEL (Roadmap) ─────────────────────────────
+function CardDetail({card,onClose}){
+  const fc=FEATURE_COLORS[card.feature]||FEATURE_COLORS['Outros'];
+  const ss=STATUS_STYLE[card.status]||STATUS_STYLE['Pendente'];
+  return(<div style={{position:'fixed',inset:0,background:'#00000055',zIndex:150,display:'flex',justifyContent:'flex-end'}} onClick={onClose}>
+    <div onClick={e=>e.stopPropagation()} style={{width:'min(480px,100%)',height:'100vh',background:'#fff',boxShadow:'-8px 0 40px #0002',display:'flex',flexDirection:'column',animation:'slideIn .2s ease'}}>
+      <div style={{padding:'20px 20px 14px',borderBottom:'1px solid #f1f5f9'}}>
+        <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:10}}>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:800,fontSize:14,color:'#1e293b',lineHeight:1.4,marginBottom:8}}>{card.title}</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              <span style={{fontSize:10,fontWeight:700,padding:'3px 8px',borderRadius:20,background:fc.soft,color:fc.text,border:`1px solid ${fc.border}`}}>{card.feature}</span>
+              <span style={{fontSize:10,fontWeight:700,padding:'3px 8px',borderRadius:20,background:ss.bg,color:ss.text,display:'flex',alignItems:'center',gap:4}}>
+                <span style={{width:5,height:5,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{card.status}
+              </span>
+              {card.isRedor&&<span style={{fontSize:10,fontWeight:700,padding:'3px 8px',borderRadius:20,background:'#fef2f2',color:'#b91c1c',border:'1px solid #fecaca'}}>Rede D'Or</span>}
+            </div>
+          </div>
+          <button onClick={onClose} style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:'#94a3b8',flexShrink:0}}>×</button>
+        </div>
+      </div>
+      <div style={{padding:'16px 20px',flex:1,overflow:'auto'}}>
+        {card.url&&<a href={card.url} target="_blank" rel="noreferrer"
+          style={{display:'flex',alignItems:'center',gap:8,padding:'12px 14px',borderRadius:10,background:'#eff6ff',border:'1px solid #bfdbfe',textDecoration:'none',marginBottom:16}}>
+          <span style={{fontSize:20}}>🔗</span>
+          <div><div style={{fontSize:12,fontWeight:700,color:'#1d4ed8'}}>Abrir no Trello</div>
+            <div style={{fontSize:10,color:'#3b82f6'}}>{card.url}</div></div>
+        </a>}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          {[['Feature Area',card.feature,fc.soft,fc.text],['Status',card.status,ss.bg,ss.text],['Prioridade',card.priority==='high'?'Alta':'Média',card.priority==='high'?'#fee2e2':'#f1f5f9',card.priority==='high'?'#b91c1c':'#64748b']].map(([l,v,bg,tc])=>(
+            <div key={l} style={{padding:'10px 12px',borderRadius:8,background:bg}}>
+              <div style={{fontSize:9,fontWeight:700,color:'#64748b',textTransform:'uppercase',marginBottom:3}}>{l}</div>
+              <div style={{fontSize:13,fontWeight:700,color:tc}}>{v}</div>
+            </div>))}
+        </div>
+      </div>
+    </div>
+  </div>);
 }
 
 // ─── ROADMAP BOARD ───────────────────────────────────────────
-const COL_W = 72, LABEL_W = 260;
+const COL_W=72, LABEL_W=280;
 
-function RoadmapBoard({ items, onPatch }) {
-  const [editCell, setEditCell] = useState(null);
-  const [editVal,  setEditVal]  = useState("");
-  const [dragOver, setDragOver] = useState(null);
-  const dragId  = useRef(null);
-  const mouseRef = useRef(null);
+function RoadmapBoard({items,onPatch,onCardClick}){
+  const [dragOverGroup,setDragOverGroup]=useState(null);
+  const [editCell,setEditCell]=useState(null);
+  const [editVal,setEditVal]=useState('');
+  const dragId=useRef(null);
+  const mouseRef=useRef(null);
 
-  const groups = useMemo(() => [...new Set(items.map(i => i.group || "Backlog"))], [items]);
+  // Group by feature area in defined order
+  const grouped=useMemo(()=>{
+    const map={};
+    items.forEach(item=>{
+      const g=item.feature||item.group||'Outros';
+      if(!map[g])map[g]=[];
+      map[g].push(item);
+    });
+    const ordered=[];
+    FEATURE_ORDER.forEach(f=>{if(map[f])ordered.push([f,map[f]]);});
+    Object.keys(map).forEach(f=>{if(!FEATURE_ORDER.includes(f))ordered.push([f,map[f]]);});
+    return ordered;
+  },[items]);
 
-  const startDrag = (e, item, type) => {
-    e.preventDefault(); e.stopPropagation();
-    const sx = e.clientX, os = item.startMonth, oe = item.endMonth;
-    mouseRef.current = { id: item.id, type, sx, os, oe };
-    const mv = ev => {
-      if (!mouseRef.current) return;
-      const { id, type: t, sx, os, oe } = mouseRef.current;
-      const delta = Math.round((ev.clientX - sx) / COL_W);
-      if (t === "move") {
-        const ns = Math.max(1, Math.min(12, os + delta));
-        onPatch(id, { startMonth: ns, endMonth: Math.min(12, ns + (oe - os)) });
-      } else {
-        onPatch(id, { endMonth: Math.max(os, Math.min(12, oe + delta)) });
-      }
+  const startDrag=(e,item,type)=>{
+    e.preventDefault();e.stopPropagation();
+    const sx=e.clientX,os=item.startMonth,oe=item.endMonth;
+    mouseRef.current={id:item.id,type,sx,os,oe};
+    const mv=ev=>{
+      if(!mouseRef.current)return;
+      const {id,type:t,sx,os,oe}=mouseRef.current;
+      const delta=Math.round((ev.clientX-sx)/COL_W);
+      if(t==='move'){const ns=Math.max(1,Math.min(12,os+delta));onPatch(id,{startMonth:ns,endMonth:Math.min(12,ns+(oe-os))});}
+      else{onPatch(id,{endMonth:Math.max(os,Math.min(12,oe+delta))});}
     };
-    const up = () => { mouseRef.current = null; window.removeEventListener("mousemove", mv); window.removeEventListener("mouseup", up); };
-    window.addEventListener("mousemove", mv);
-    window.addEventListener("mouseup", up);
+    const up=()=>{mouseRef.current=null;window.removeEventListener('mousemove',mv);window.removeEventListener('mouseup',up);};
+    window.addEventListener('mousemove',mv);window.addEventListener('mouseup',up);
   };
 
-  if (items.length === 0) {
-    return (
-      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"60px 20px",textAlign:"center",color:"#94a3b8"}}>
-        <div style={{fontSize:36,marginBottom:12}}>📂</div>
-        <div style={{fontWeight:700,fontSize:15,color:"#64748b",marginBottom:6}}>Nenhum card ainda</div>
-        <div style={{fontSize:13}}>Importe o arquivo JSON do Trello para ver os cards aqui</div>
+  if(!items.length)return(
+    <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,padding:'60px 20px',textAlign:'center'}}>
+      <div style={{fontSize:36,marginBottom:12}}>📋</div>
+      <div style={{fontWeight:700,fontSize:15,color:'#64748b',marginBottom:6}}>Nenhum card para mostrar</div>
+      <div style={{fontSize:13,color:'#94a3b8'}}>Ajuste os filtros ou importe o JSON do Trello</div>
+    </div>);
+
+  return(<div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,overflow:'auto',maxHeight:'calc(100vh - 280px)'}}>
+    <div style={{minWidth:LABEL_W+COL_W*12}}>
+      {/* Month header */}
+      <div style={{display:'grid',gridTemplateColumns:`${LABEL_W}px repeat(12,${COL_W}px)`,background:'#f8fafc',borderBottom:'2px solid #e2e8f0',position:'sticky',top:0,zIndex:5}}>
+        <div style={{padding:'8px 14px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',borderRight:'1px solid #e2e8f0'}}>Iniciativa — {CURRENT_YEAR}</div>
+        {MONTHS.map((m,i)=>(
+          <div key={m} style={{padding:'8px 4px',textAlign:'center',fontSize:10,fontWeight:700,borderRight:'1px solid #e2e8f0',color:i+1===CURRENT_MONTH?'#3b82f6':'#94a3b8',background:i+1===CURRENT_MONTH?'#eff6ff':undefined}}>
+            {m}{i+1===CURRENT_MONTH&&<div style={{width:4,height:4,background:'#3b82f6',borderRadius:'50%',margin:'2px auto 0'}}/>}
+          </div>))}
       </div>
-    );
-  }
 
-  return (
-    <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,overflow:"auto",maxHeight:"calc(100vh - 260px)"}}>
-      <div style={{minWidth: LABEL_W + COL_W * 12}}>
-        {/* Month header */}
-        <div style={{display:"grid",gridTemplateColumns:`${LABEL_W}px repeat(12, ${COL_W}px)`,
-          background:"#f8fafc",borderBottom:"2px solid #e2e8f0",position:"sticky",top:0,zIndex:5}}>
-          <div style={{padding:"8px 14px",fontSize:10,fontWeight:700,color:"#94a3b8",
-            textTransform:"uppercase",borderRight:"1px solid #e2e8f0"}}>Iniciativa</div>
-          {MONTHS.map((m, i) => (
-            <div key={m} style={{padding:"8px 4px",textAlign:"center",fontSize:10,fontWeight:700,
-              borderRight:"1px solid #e2e8f0",
-              color: i+1 === CURRENT_MONTH ? "#3b82f6" : "#94a3b8",
-              background: i+1 === CURRENT_MONTH ? "#eff6ff" : undefined}}>
-              {m}
-              {i+1 === CURRENT_MONTH && <div style={{width:4,height:4,background:"#3b82f6",borderRadius:"50%",margin:"2px auto 0"}}/>}
-            </div>
-          ))}
-        </div>
+      {/* Feature area groups */}
+      {grouped.map(([feature,groupItems])=>{
+        const fc=FEATURE_COLORS[feature]||FEATURE_COLORS['Outros'];
+        const isOver=dragOverGroup===feature;
+        // Status summary
+        const statusCount={};
+        groupItems.forEach(i=>{statusCount[i.status]=(statusCount[i.status]||0)+1;});
+        const topStatuses=Object.entries(statusCount).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
-        {/* Groups */}
-        {groups.map(grp => (
-          <div key={grp}
-            onDragOver={e => { e.preventDefault(); setDragOver(grp); }}
-            onDragLeave={() => setDragOver(null)}
-            onDrop={e => { e.preventDefault(); if (dragId.current) onPatch(dragId.current, { group: grp }); setDragOver(null); }}>
+        return(<div key={feature}
+          onDragOver={e=>{e.preventDefault();setDragOverGroup(feature);}}
+          onDragLeave={()=>setDragOverGroup(null)}
+          onDrop={e=>{e.preventDefault();if(dragId.current)onPatch(dragId.current,{feature,group:feature});setDragOverGroup(null);}}>
 
-            {/* Group header */}
-            <div style={{display:"grid",gridTemplateColumns:`${LABEL_W}px repeat(12, ${COL_W}px)`,
-              background: dragOver===grp ? "#f0f9ff" : "#f8fafc",borderBottom:"1px solid #e2e8f0",minHeight:34}}>
-              <div style={{padding:"7px 14px",display:"flex",alignItems:"center",gap:6,borderRight:"1px solid #e2e8f0"}}>
-                <span style={{fontSize:10.5,fontWeight:700,color:"#64748b",textTransform:"uppercase"}}>{grp}</span>
-                <span style={{fontSize:9,color:"#94a3b8"}}>({items.filter(i=>i.group===grp).length})</span>
-                {dragOver===grp && <span style={{fontSize:9,color:"#3b82f6",fontWeight:600,marginLeft:4}}>↓ soltar aqui</span>}
+          {/* Group header */}
+          <div style={{display:'grid',gridTemplateColumns:`${LABEL_W}px repeat(12,${COL_W}px)`,background:isOver?fc.soft:'#f8fafc',borderBottom:'1px solid #e2e8f0',minHeight:38,transition:'background .15s'}}>
+            <div style={{padding:'7px 14px',display:'flex',alignItems:'center',gap:8,borderRight:'1px solid #e2e8f0'}}>
+              <span style={{width:8,height:8,borderRadius:'50%',background:fc.bar,flexShrink:0}}/>
+              <span style={{fontSize:11,fontWeight:800,color:fc.text}}>{feature}</span>
+              <span style={{fontSize:9.5,padding:'1px 6px',borderRadius:20,background:`${fc.bar}18`,color:fc.text,fontWeight:700}}>{groupItems.length}</span>
+              <div style={{display:'flex',gap:4,marginLeft:4,flexWrap:'wrap'}}>
+                {topStatuses.map(([s,n])=>{const ss=STATUS_STYLE[s]||STATUS_STYLE['Pendente'];return(
+                  <span key={s} style={{fontSize:8.5,padding:'1px 5px',borderRadius:20,background:ss.bg,color:ss.text,fontWeight:600,whiteSpace:'nowrap'}}>{s} ({n})</span>);})}
               </div>
-              {MONTHS.map((_, i) => (
-                <div key={i} style={{borderRight:"1px solid #e2e8f0",
-                  background: i+1===CURRENT_MONTH ? "#eff6ff22" : undefined}}/>
-              ))}
+              {isOver&&<span style={{fontSize:9,color:fc.text,fontWeight:600,marginLeft:'auto'}}>↓ soltar</span>}
             </div>
-
-            {/* Item rows */}
-            {items.filter(it => it.group === grp).map(item => {
-              const pc = BAR_COLORS[item.priority] || BAR_COLORS.medium;
-              const sc = SRC_S[item.source] || SRC_S.manual;
-              return (
-                <div key={item.id}
-                  className="rm-row"
-                  draggable
-                  onDragStart={() => dragId.current = item.id}
-                  onDragEnd={() => { dragId.current = null; setDragOver(null); }}
-                  style={{display:"grid",gridTemplateColumns:`${LABEL_W}px repeat(12, ${COL_W}px)`,
-                    borderBottom:"1px solid #f1f5f9",minHeight:50,cursor:"grab",background:"#fff"}}>
-
-                  {/* Label */}
-                  <div style={{padding:"8px 12px",borderRight:"1px solid #e2e8f0",display:"flex",
-                    flexDirection:"column",justifyContent:"center",gap:4}}>
-                    <div style={{fontSize:12,fontWeight:500,color:"#1e293b",lineHeight:1.3,
-                      whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}} title={item.title}>
-                      {item.title}
-                    </div>
-                    <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                      <span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:20,
-                        background:sc.bg,color:sc.text,border:`1px solid ${sc.border}`}}>{sc.label}</span>
-
-                      {editCell?.id === item.id && editCell.f === "priority" ? (
-                        <select autoFocus value={editVal}
-                          onChange={e => setEditVal(e.target.value)}
-                          onBlur={() => { onPatch(item.id, { priority: editVal }); setEditCell(null); }}
-                          style={{fontSize:9,border:"1px solid #e2e8f0",borderRadius:4,padding:"1px 4px"}}>
-                          {["critical","high","medium","low"].map(p => <option key={p}>{p}</option>)}
-                        </select>
-                      ) : (
-                        <span
-                          onClick={() => { setEditCell({ id:item.id, f:"priority" }); setEditVal(item.priority); }}
-                          title="Clique para editar"
-                          style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:20,cursor:"pointer",
-                            background: item.priority==="critical"?"#fef2f2":item.priority==="high"?"#fff7ed":item.priority==="low"?"#f0fdf4":"#eff6ff",
-                            color: item.priority==="critical"?"#dc2626":item.priority==="high"?"#c2410c":item.priority==="low"?"#15803d":"#1d4ed8"}}>
-                          {item.priority}
-                        </span>
-                      )}
-
-                      {item.trelloUrl && (
-                        <a href={item.trelloUrl} target="_blank" rel="noreferrer"
-                          style={{fontSize:9,color:"#94a3b8",textDecoration:"none"}} title="Abrir no Trello">↗</a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Timeline cells */}
-                  {MONTHS.map((_, mi) => {
-                    const mo = mi + 1;
-                    const active = mo >= item.startMonth && mo <= item.endMonth;
-                    const isS = mo === item.startMonth, isE = mo === item.endMonth;
-                    return (
-                      <div key={mi}
-                        style={{borderRight:"1px solid #f1f5f9",display:"flex",alignItems:"center",padding:"0 2px",
-                          background: mi+1===CURRENT_MONTH ? "#eff6ff22" : undefined}}>
-                        {active && (
-                          <div
-                            onMouseDown={e => startDrag(e, item, "move")}
-                            style={{height:26,width:"100%",background:pc,opacity:0.85,cursor:"grab",position:"relative",
-                              borderRadius:`${isS?"6px":"0"} ${isE?"6px":"0"} ${isE?"6px":"0"} ${isS?"6px":"0"}`,
-                              marginLeft:isS?2:0, marginRight:isE?2:0}}>
-                            {isS && (
-                              <span style={{position:"absolute",left:6,top:"50%",transform:"translateY(-50%)",
-                                fontSize:8,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",pointerEvents:"none"}}>
-                                {item.endMonth > item.startMonth
-                                  ? `${MONTHS[item.startMonth-1]}–${MONTHS[item.endMonth-1]}`
-                                  : MONTHS[item.startMonth-1]}
-                              </span>
-                            )}
-                            {isE && (
-                              <div
-                                onMouseDown={e => { e.stopPropagation(); startDrag(e, item, "resize"); }}
-                                style={{position:"absolute",right:0,top:0,bottom:0,width:10,cursor:"ew-resize",
-                                  display:"flex",alignItems:"center",justifyContent:"center",gap:1}}>
-                                <div style={{width:1.5,height:10,background:"rgba(255,255,255,0.5)",borderRadius:1}}/>
-                                <div style={{width:1.5,height:10,background:"rgba(255,255,255,0.5)",borderRadius:1}}/>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+            {MONTHS.map((_,i)=><div key={i} style={{borderRight:'1px solid #e2e8f0',background:i+1===CURRENT_MONTH?`${fc.bar}08`:undefined}}/>)}
           </div>
-        ))}
-      </div>
+
+          {/* Item rows */}
+          {groupItems.map(item=>{
+            const ss=STATUS_STYLE[item.status]||STATUS_STYLE['Pendente'];
+            return(<div key={item.id}
+              draggable
+              onDragStart={()=>dragId.current=item.id}
+              onDragEnd={()=>{dragId.current=null;setDragOverGroup(null);}}
+              style={{display:'grid',gridTemplateColumns:`${LABEL_W}px repeat(12,${COL_W}px)`,borderBottom:'1px solid #f1f5f9',minHeight:50,background:'#fff',transition:'background .1s',cursor:'grab'}}
+              onMouseEnter={e=>e.currentTarget.style.background='#f8fbff'}
+              onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
+
+              {/* Label */}
+              <div style={{padding:'8px 12px',borderRight:'1px solid #e2e8f0',display:'flex',flexDirection:'column',justifyContent:'center',gap:4}}>
+                <div onClick={()=>onCardClick(item)} style={{fontSize:11.5,fontWeight:500,color:'#1e293b',lineHeight:1.3,cursor:'pointer',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}} title={item.title}>
+                  {item.title}
+                </div>
+                <div style={{display:'flex',gap:4,alignItems:'center',flexWrap:'wrap'}}>
+                  <span style={{fontSize:8.5,fontWeight:700,padding:'1px 5px',borderRadius:20,background:ss.bg,color:ss.text,display:'flex',alignItems:'center',gap:3,whiteSpace:'nowrap'}}>
+                    <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{item.status}
+                  </span>
+                  {item.isRedor&&<span style={{fontSize:8,fontWeight:700,padding:'1px 5px',borderRadius:20,background:'#fef2f2',color:'#b91c1c',whiteSpace:'nowrap'}}>Rede D'Or</span>}
+                  {item.url&&<a href={item.url} target="_blank" rel="noreferrer" style={{fontSize:9,color:'#94a3b8',textDecoration:'none'}} title="Abrir no Trello" onClick={e=>e.stopPropagation()}>↗</a>}
+                </div>
+              </div>
+
+              {/* Timeline cells */}
+              {MONTHS.map((_,mi)=>{
+                const mo=mi+1,active=mo>=item.startMonth&&mo<=item.endMonth;
+                const isS=mo===item.startMonth,isE=mo===item.endMonth;
+                return(<div key={mi} style={{borderRight:'1px solid #f1f5f9',display:'flex',alignItems:'center',padding:'0 2px',background:mi+1===CURRENT_MONTH?`${fc.bar}08`:undefined}}>
+                  {active&&<div onMouseDown={e=>startDrag(e,item,'move')}
+                    style={{height:26,width:'100%',background:fc.bar,opacity:0.82,cursor:'grab',position:'relative',
+                      borderRadius:`${isS?'6px':'0'} ${isE?'6px':'0'} ${isE?'6px':'0'} ${isS?'6px':'0'}`,
+                      marginLeft:isS?2:0,marginRight:isE?2:0}}>
+                    {isS&&<span style={{position:'absolute',left:5,top:'50%',transform:'translateY(-50%)',fontSize:8,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',pointerEvents:'none'}}>
+                      {item.endMonth>item.startMonth?`${MONTHS[item.startMonth-1]}–${MONTHS[item.endMonth-1]}`:MONTHS[item.startMonth-1]}
+                    </span>}
+                    {isE&&<div onMouseDown={e=>{e.stopPropagation();startDrag(e,item,'resize');}}
+                      style={{position:'absolute',right:0,top:0,bottom:0,width:10,cursor:'ew-resize',display:'flex',alignItems:'center',justifyContent:'center',gap:1}}>
+                      <div style={{width:1.5,height:10,background:'rgba(255,255,255,0.5)',borderRadius:1}}/>
+                      <div style={{width:1.5,height:10,background:'rgba(255,255,255,0.5)',borderRadius:1}}/>
+                    </div>}
+                  </div>}
+                </div>);})}
+            </div>);
+          })}
+        </div>);
+      })}
     </div>
-  );
+  </div>);
 }
 
-// ─── TRELLO IMPORT SCREEN ────────────────────────────────────
-function TrelloImport({ onImport }) {
-  const [dragging, setDragging] = useState(false);
-  const [error, setError] = useState(null);
-  const fileRef = useRef(null);
-
-  const process = file => {
-    setError(null);
-    if (!file || !file.name.endsWith(".json")) {
-      setError("Por favor selecione um arquivo .json exportado do Trello.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const parsed = JSON.parse(e.target.result);
-        const items = parseTrelloJSON(parsed);
-        if (!items.length) { setError("Nenhum card encontrado. Verifique se é um export válido do Trello."); return; }
-        onImport(items, parsed.name || "Board Trello");
-      } catch (err) {
-        setError("Arquivo JSON inválido. Exporte novamente pelo Trello.");
-      }
+// ─── IMPORT SCREEN ───────────────────────────────────────────
+function ImportScreen({onImport}){
+  const [drag,setDrag]=useState(false);
+  const [err,setErr]=useState(null);
+  const ref=useRef(null);
+  const process=file=>{
+    setErr(null);
+    if(!file||!file.name.endsWith('.json')){setErr('Selecione um arquivo .json exportado do Trello.');return;}
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const parsed=JSON.parse(e.target.result);
+        const items=parseTrello(parsed);
+        if(!items.length){setErr('Nenhum card encontrado. Verifique se é um export válido do Trello.');return;}
+        onImport(items,parsed.name||'Board Trello');
+      }catch{setErr('Arquivo JSON inválido. Exporte novamente pelo Trello.');}
     };
     reader.readAsText(file);
   };
-
-  return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"calc(100vh - 100px)",padding:24}}>
-      <div style={{maxWidth:480,width:"100%"}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{width:56,height:56,borderRadius:14,background:"#3b82f6",color:"#fff",
-            fontWeight:800,fontSize:24,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>H</div>
-          <h1 style={{fontSize:22,fontWeight:800,color:"#1e293b",marginBottom:8}}>Hospp Roadmap Agent</h1>
-          <p style={{fontSize:13,color:"#64748b",lineHeight:1.6}}>
-            Importe o arquivo JSON do seu board Trello<br/>para começar a montar o roadmap.
-          </p>
-        </div>
-
-        <div
-          onDragOver={e => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={e => { e.preventDefault(); setDragging(false); process(e.dataTransfer.files[0]); }}
-          onClick={() => fileRef.current?.click()}
-          style={{border:`2px dashed ${dragging ? "#3b82f6" : "#e2e8f0"}`,borderRadius:14,
-            padding:"40px 24px",textAlign:"center",cursor:"pointer",
-            background: dragging ? "#eff6ff" : "#f8fafc",transition:"all .15s"}}>
-          <div style={{fontSize:36,marginBottom:12}}>📁</div>
-          <div style={{fontWeight:700,fontSize:14,color:"#1e293b",marginBottom:4}}>
-            {dragging ? "Solte o arquivo aqui" : "Arraste o arquivo JSON"}
-          </div>
-          <div style={{fontSize:12,color:"#94a3b8",marginBottom:16}}>ou clique para selecionar</div>
-          <button className="btn btn-primary" onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}>
-            Selecionar arquivo .json
-          </button>
-          <input ref={fileRef} type="file" accept=".json" style={{display:"none"}}
-            onChange={e => process(e.target.files[0])}/>
-        </div>
-
-        {error && (
-          <div style={{marginTop:12,padding:"10px 14px",background:"#fef2f2",border:"1px solid #fecaca",
-            borderRadius:8,fontSize:12,color:"#dc2626"}}>{error}</div>
-        )}
-
-        <div style={{marginTop:20,padding:"14px 18px",background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10}}>
-          <div style={{fontSize:11,fontWeight:700,color:"#92400e",marginBottom:6}}>Como exportar do Trello:</div>
-          <ol style={{fontSize:11,color:"#78350f",lineHeight:1.8,paddingLeft:16}}>
-            <li>Abra o seu board no Trello</li>
-            <li>Clique em <strong>Menu (···)</strong> → <strong>Mais</strong></li>
-            <li>Clique em <strong>Imprimir e Exportar</strong></li>
-            <li>Clique em <strong>Exportar como JSON</strong></li>
-            <li>Salve o arquivo e importe aqui</li>
-          </ol>
-        </div>
+  return(<div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'calc(100vh - 52px)',padding:24}}>
+    <div style={{maxWidth:480,width:'100%'}}>
+      <div style={{textAlign:'center',marginBottom:32}}>
+        <div style={{width:56,height:56,borderRadius:14,background:'#3b82f6',color:'#fff',fontWeight:800,fontSize:24,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px'}}>H</div>
+        <h1 style={{fontSize:22,fontWeight:800,color:'#1e293b',marginBottom:8}}>Hospp Roadmap Agent</h1>
+        <p style={{fontSize:13,color:'#64748b',lineHeight:1.6}}>Importe o arquivo JSON do seu board Trello<br/>para começar a montar o roadmap.</p>
+      </div>
+      <div onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)}
+        onDrop={e=>{e.preventDefault();setDrag(false);process(e.dataTransfer.files[0]);}}
+        onClick={()=>ref.current?.click()}
+        style={{border:`2px dashed ${drag?'#3b82f6':'#e2e8f0'}`,borderRadius:14,padding:'40px 24px',textAlign:'center',cursor:'pointer',background:drag?'#eff6ff':'#f8fafc',transition:'all .15s'}}>
+        <div style={{fontSize:36,marginBottom:12}}>📁</div>
+        <div style={{fontWeight:700,fontSize:14,color:'#1e293b',marginBottom:4}}>{drag?'Solte o arquivo aqui':'Arraste o arquivo JSON'}</div>
+        <div style={{fontSize:12,color:'#94a3b8',marginBottom:16}}>ou clique para selecionar</div>
+        <button onClick={e=>{e.stopPropagation();ref.current?.click();}} style={{padding:'8px 18px',borderRadius:8,background:'#3b82f6',color:'#fff',fontWeight:700,fontSize:12,border:'none',cursor:'pointer'}}>Selecionar arquivo .json</button>
+        <input ref={ref} type="file" accept=".json" style={{display:'none'}} onChange={e=>process(e.target.files[0])}/>
+      </div>
+      {err&&<div style={{marginTop:12,padding:'10px 14px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,fontSize:12,color:'#dc2626'}}>{err}</div>}
+      <div style={{marginTop:20,padding:'14px 18px',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10}}>
+        <div style={{fontSize:11,fontWeight:700,color:'#92400e',marginBottom:6}}>Como exportar do Trello:</div>
+        <ol style={{fontSize:11,color:'#78350f',lineHeight:1.8,paddingLeft:16}}>
+          <li>Abra o board no Trello</li>
+          <li>Clique em <strong>··· (Menu)</strong> ao lado do nome do board</li>
+          <li>Clique em <strong>Imprimir, exportar e compartilhar</strong></li>
+          <li>Clique em <strong>Exportar como JSON</strong></li>
+          <li>Na página que abrir, pressione <strong>Ctrl+S</strong> para salvar</li>
+        </ol>
       </div>
     </div>
-  );
+  </div>);
 }
 
 // ─── MAIN APP ────────────────────────────────────────────────
-function App() {
-  // State — persisted in localStorage
-  const [frentes,     setFrentesRaw]  = useState(() => LS.get("hospp:frentes", FRENTES_INIT));
-  const [trelloItems, setTrelloItems] = useState(() => LS.get("hospp:trello",  []));
-  const [manualItems, setManualItems] = useState(() => LS.get("hospp:manual",  []));
-  const [overlay,     setOverlayRaw]  = useState(() => LS.get("hospp:overlay", {}));
-  const [boardName,   setBoardName]   = useState(() => LS.get("hospp:boardName", null));
+function App(){
+  const [frentes,setFrentesRaw]  =useState(()=>LS.get('hospp:frentes',FRENTES_INIT));
+  const [trelloItems,setTrelloRaw]=useState(()=>LS.get('hospp:trello',[]));
+  const [overlay,setOverlayRaw]  =useState(()=>LS.get('hospp:overlay',{}));
+  const [boardName,setBoardName] =useState(()=>LS.get('hospp:boardName',null));
 
-  const [tab,          setTab]         = useState("frentes");
-  const [showDeps,     setShowDeps]    = useState(true);
-  const [hov,          setHov]         = useState(null);
-  const [editing,      setEditing]     = useState(null);
-  const [drill,        setDrill]       = useState(null);
-  const [dragOver,     setDragOver]    = useState(null);
-  const [filterGrupo,  setFilterGrupo] = useState(0);
-  const [activeFrente, setActiveFrente]= useState(null);
-  const [filterSrc,    setFilterSrc]   = useState("all");
+  const [tab,setTab]=useState('frentes');
+  const [showDeps,setShowDeps]=useState(true);
+  const [hov,setHov]=useState(null);
+  const [editing,setEditing]=useState(null);
+  const [drill,setDrill]=useState(null);
+  const [dragOver,setDragOver]=useState(null);
+  const [filterGrupo,setFilterGrupo]=useState(0);
+  const [activeFrente,setActiveFrente]=useState(null);
+  const [filterStatus,setFilterStatus]=useState('active');
+  const [filterFeature,setFilterFeature]=useState('all');
+  const [selectedCard,setSelectedCard]=useState(null);
 
-  const refs   = useRef({});
-  const dragId = useRef(null);
+  const refs=useRef({});
+  const dragId=useRef(null);
 
-  // Persist helpers
-  const setFreentes = v => { setFrentesRaw(v); LS.set("hospp:frentes", v); };
-  const setOverlay  = v => { setOverlayRaw(v); LS.set("hospp:overlay", v); };
+  const setFreentes=v=>{setFrentesRaw(v);LS.set('hospp:frentes',v);};
+  const setOverlay=v=>{setOverlayRaw(v);LS.set('hospp:overlay',v);};
 
-  // Merge trello + manual + overlay
-  const allItems = useMemo(() => {
-    const base = [...trelloItems, ...manualItems];
-    return base.map(item => {
-      const ov = overlay[item.id];
-      if (!ov) return item;
-      // Source fields (title, desc) stay from source; roadmap fields from overlay
-      const { title: _t, description: _d, source: _s, ...roadmapPatch } = ov;
-      return { ...item, ...roadmapPatch };
-    });
-  }, [trelloItems, manualItems, overlay]);
+  const patchItem=useCallback((id,patch)=>{
+    setTrelloRaw(p=>{const u=p.map(i=>i.id===id?{...i,...patch}:i);LS.set('hospp:trello',u);return u;});
+    setOverlay({...overlay,[id]:{...(overlay[id]||{}),...patch}});
+  },[overlay]);
 
-  const patchItem = useCallback((id, patch) => {
-    // Optimistic UI
-    setTrelloItems(p => p.map(i => i.id === id ? { ...i, ...patch } : i));
-    setManualItems(p => p.map(i => i.id === id ? { ...i, ...patch } : i));
-    // Persist in overlay
-    setOverlay({ ...overlay, [id]: { ...(overlay[id] || {}), ...patch } });
-  }, [overlay]);
-
-  const onTrelloImport = (items, name) => {
-    // Merge new items with existing overlay
-    const merged = items.map(item => {
-      const ov = overlay[item.id];
-      if (!ov) return item;
-      const { title: _t, description: _d, source: _s, ...roadmapPatch } = ov;
-      return { ...item, ...roadmapPatch };
-    });
-    setTrelloItems(merged);
-    LS.set("hospp:trello", merged);
-    setBoardName(name);
-    LS.set("hospp:boardName", name);
-    setTab("frentes");
+  const onImport=(items,name)=>{
+    const merged=items.map(item=>{const ov=overlay[item.id];if(!ov)return item;const{title:_t,source:_s,...p}=ov;return{...item,...p};});
+    setTrelloRaw(merged);LS.set('hospp:trello',merged);
+    setBoardName(name);LS.set('hospp:boardName',name);
+    setTab('frentes');
   };
 
-  const saveFrente = form => {
+  const saveFrente=form=>{
     let updated;
-    if (form.id && frentes.find(f => f.id === form.id)) {
-      updated = frentes.map(f => f.id === form.id ? form : f);
-    } else {
-      const mx = Math.max(...frentes.map(f => f.num), 0);
-      updated = [...frentes, { ...form, id: `m${Date.now()}`, num: mx + 1 }];
-    }
+    if(form.id&&frentes.find(f=>f.id===form.id))updated=frentes.map(f=>f.id===form.id?form:f);
+    else{const mx=Math.max(...frentes.map(f=>f.num),0);updated=[...frentes,{...form,id:`m${Date.now()}`,num:mx+1}];}
     setFreentes(updated);
   };
 
-  const openRoadmap = f => { setActiveFrente(f); setTab("roadmap"); setDrill(null); };
+  const openRoadmap=f=>{setActiveFrente(f);setFilterFeature(f.titulo);setTab('roadmap');setDrill(null);};
 
-  const visFrente = filterGrupo === 0 ? frentes : frentes.filter(f => f.grupo === filterGrupo);
-  const shownGrupos = filterGrupo === 0 ? GRUPOS : GRUPOS.filter(g => g.id === filterGrupo);
+  const allItems=useMemo(()=>trelloItems.map(item=>{
+    const ov=overlay[item.id];if(!ov)return item;
+    const{title:_t,source:_s,...p}=ov;return{...item,...p};
+  }),[trelloItems,overlay]);
 
-  const roadmapItems = useMemo(() => {
-    let items = allItems;
-    if (activeFrente) return items.filter(i =>
-      i.group === activeFrente.titulo || i.listName === activeFrente.titulo);
-    if (filterSrc !== "all") items = items.filter(i => i.source === filterSrc);
+  const roadmapItems=useMemo(()=>{
+    let items=allItems;
+    // Status filter
+    if(filterStatus==='active')items=items.filter(i=>i.active);
+    else if(filterStatus==='validar')items=items.filter(i=>i.status==='Validar no Publicado');
+    else if(filterStatus==='andamento')items=items.filter(i=>['Em andamento','Aprovado','Em teste'].includes(i.status));
+    else if(filterStatus==='pendente')items=items.filter(i=>['Pendente','Aguardando Aprovação','Backlog'].includes(i.status));
+    // Feature filter
+    if(activeFrente)items=items.filter(i=>i.feature===activeFrente.titulo||i.group===activeFrente.titulo);
+    else if(filterFeature!=='all')items=items.filter(i=>i.feature===filterFeature||i.group===filterFeature);
     return items;
-  }, [allItems, activeFrente, filterSrc]);
+  },[allItems,filterStatus,filterFeature,activeFrente]);
 
-  const hasData = trelloItems.length > 0 || manualItems.length > 0;
+  const features=useMemo(()=>[...new Set(allItems.map(i=>i.feature||i.group||'Outros'))].sort(),[allItems]);
+  const hasData=trelloItems.length>0;
+  const visFrente=filterGrupo===0?frentes:frentes.filter(f=>f.grupo===filterGrupo);
+  const shownGrupos=filterGrupo===0?GRUPOS:GRUPOS.filter(g=>g.id===filterGrupo);
+  const dragH=f=>({onDragStart:e=>{dragId.current=f.id;e.dataTransfer.effectAllowed='move';},onDragEnd:()=>{dragId.current=null;setDragOver(null);}});
 
-  const dragH = f => ({
-    onDragStart: e => { dragId.current = f.id; e.dataTransfer.effectAllowed = "move"; },
-    onDragEnd:   () => { dragId.current = null; setDragOver(null); },
-  });
-
-  // Show import screen if no data yet
-  if (!hasData) {
-    return (
-      <div>
-        <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 20px",height:52,
-          display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:26,height:26,borderRadius:7,background:"#3b82f6",color:"#fff",fontWeight:800,
-            fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>H</div>
-          <span style={{fontWeight:800,fontSize:14,color:"#1e293b"}}>Hospp Roadmap Agent</span>
-          <span style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"#eff6ff",color:"#3b82f6",fontWeight:700}}>Fase 1</span>
-        </div>
-        <TrelloImport onImport={onTrelloImport}/>
+  if(!hasData) return(
+    <div>
+      <div style={{background:'#fff',borderBottom:'1px solid #e2e8f0',padding:'0 20px',height:52,display:'flex',alignItems:'center',gap:10}}>
+        <div style={{width:26,height:26,borderRadius:7,background:'#3b82f6',color:'#fff',fontWeight:800,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center'}}>H</div>
+        <span style={{fontWeight:800,fontSize:14,color:'#1e293b'}}>Hospp Roadmap Agent</span>
+        <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:'#eff6ff',color:'#3b82f6',fontWeight:700}}>Fase 1</span>
       </div>
-    );
-  }
+      <ImportScreen onImport={onImport}/>
+    </div>);
 
-  return (
-    <div style={{fontFamily:"system-ui,-apple-system,sans-serif",background:"#f8fafc",minHeight:"100vh"}}>
+  return(<div style={{fontFamily:'system-ui,-apple-system,sans-serif',background:'#f1f5f9',minHeight:'100vh'}}>
 
-      {/* ── TOP BAR ── */}
-      <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 20px",height:52,
-        display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:50}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-          <div style={{width:26,height:26,borderRadius:7,background:"#3b82f6",color:"#fff",fontWeight:800,
-            fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>H</div>
-          <span style={{fontWeight:800,fontSize:14,color:"#1e293b",whiteSpace:"nowrap"}}>Hospp</span>
-          <span style={{color:"#cbd5e1"}}>/</span>
-          <span style={{fontSize:12,color:"#64748b",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:160}}>
-            {boardName || "Roadmap Agent"}
-          </span>
-          {tab === "roadmap" && activeFrente && <>
-            <span style={{color:"#cbd5e1"}}>/</span>
-            <span style={{fontWeight:600,fontSize:11,color:"#3b82f6",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:160}}>
-              #{activeFrente.num} {activeFrente.titulo}
-            </span>
-            <button onClick={() => setActiveFrente(null)}
-              style={{fontSize:10,padding:"2px 7px",borderRadius:20,border:"1px solid #e2e8f0",background:"#fff",
-                color:"#94a3b8",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>× limpar</button>
-          </>}
-        </div>
-
-        <div style={{display:"flex",gap:6,flexShrink:0}}>
-          {tab === "frentes" && <>
-            <button className={`btn ${showDeps ? "btn-active" : "btn-ghost"}`}
-              onClick={() => setShowDeps(d => !d)}>
-              {showDeps ? "Ocultar setas" : "Mostrar setas"}
-            </button>
-            <button className="btn btn-primary" onClick={() => setEditing({})}>+ Nova Frente</button>
-          </>}
-          <button className="btn btn-ghost" onClick={() => {
-            if (confirm("Importar novo JSON? Os cards atuais serão substituídos (edições de roadmap são mantidas).")) {
-              setTrelloItems([]); LS.set("hospp:trello", []);
-            }
-          }}>📂 Novo JSON</button>
-        </div>
+    {/* TOP BAR */}
+    <div style={{background:'#fff',borderBottom:'1px solid #e2e8f0',padding:'0 20px',height:52,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:50}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+        <div style={{width:26,height:26,borderRadius:7,background:'#3b82f6',color:'#fff',fontWeight:800,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>H</div>
+        <span style={{fontWeight:800,fontSize:14,color:'#1e293b',whiteSpace:'nowrap'}}>Hospp</span>
+        <span style={{color:'#cbd5e1'}}>/</span>
+        <span style={{fontSize:12,color:'#64748b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:180}}>{boardName||'Roadmap'}</span>
+        {tab==='roadmap'&&activeFrente&&<>
+          <span style={{color:'#cbd5e1'}}>/</span>
+          <span style={{fontWeight:600,fontSize:11,color:'#3b82f6',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:160}}>#{activeFrente.num} {activeFrente.titulo}</span>
+          <button onClick={()=>{setActiveFrente(null);setFilterFeature('all');}} style={{fontSize:10,padding:'2px 7px',borderRadius:20,border:'1px solid #e2e8f0',background:'#fff',color:'#94a3b8',cursor:'pointer',flexShrink:0}}>× limpar</button>
+        </>}
       </div>
-
-      {/* ── TABS ── */}
-      <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 20px",display:"flex",gap:0}}>
-        {[
-          ["frentes", `Frentes de Ação (${frentes.length})`],
-          ["roadmap", `Roadmap — ${boardName || "Trello"} (${allItems.length})`],
-        ].map(([id, lbl]) => (
-          <button key={id} onClick={() => setTab(id)}
-            style={{padding:"10px 16px",fontSize:12,fontWeight:700,border:"none",
-              borderBottom:`2px solid ${tab===id?"#3b82f6":"transparent"}`,
-              background:"none",color:tab===id?"#3b82f6":"#94a3b8",cursor:"pointer",transition:"color .15s"}}>
-            {lbl}
+      <div style={{display:'flex',gap:6,flexShrink:0}}>
+        {tab==='frentes'&&<>
+          <button onClick={()=>setShowDeps(d=>!d)} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,cursor:'pointer',border:`1.5px solid ${showDeps?'#3b82f6':'#e2e8f0'}`,background:showDeps?'#eff6ff':'#fff',color:showDeps?'#1d4ed8':'#64748b'}}>
+            {showDeps?'Ocultar setas':'Mostrar setas'}
           </button>
+          <button onClick={()=>setEditing({})} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'none',background:'#3b82f6',color:'#fff',cursor:'pointer'}}>+ Nova Frente</button>
+        </>}
+        <button onClick={()=>{if(confirm('Importar novo JSON? Cards atuais serão substituídos (edições mantidas).')){{setTrelloRaw([]);LS.set('hospp:trello',[]);}}}} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',cursor:'pointer'}}>
+          Novo JSON
+        </button>
+      </div>
+    </div>
+
+    {/* TABS */}
+    <div style={{background:'#fff',borderBottom:'1px solid #e2e8f0',padding:'0 20px',display:'flex',gap:0}}>
+      {[['frentes',`Frentes (${frentes.length})`],['roadmap',`Roadmap — ${boardName||'Trello'} (${roadmapItems.length}/${allItems.length})`]].map(([id,lbl])=>(
+        <button key={id} onClick={()=>setTab(id)} style={{padding:'10px 16px',fontSize:12,fontWeight:700,border:'none',borderBottom:`2px solid ${tab===id?'#3b82f6':'transparent'}`,background:'none',color:tab===id?'#3b82f6':'#94a3b8',cursor:'pointer',transition:'color .15s'}}>{lbl}</button>
+      ))}
+    </div>
+
+    {/* FRENTES TAB */}
+    {tab==='frentes'&&<div style={{padding:20}}>
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14,flexWrap:'wrap'}}>
+        <button onClick={()=>setFilterGrupo(0)} style={{padding:'4px 12px',borderRadius:20,fontSize:10.5,fontWeight:700,cursor:'pointer',border:`1.5px solid ${filterGrupo===0?'#3b82f6':'#e2e8f0'}`,background:filterGrupo===0?'#3b82f6':'#fff',color:filterGrupo===0?'#fff':'#64748b'}}>Todos ({frentes.length})</button>
+        {GRUPOS.map(g=>(
+          <button key={g.id} onClick={()=>setFilterGrupo(g.id)} style={{padding:'4px 12px',borderRadius:20,fontSize:10.5,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',border:`1.5px solid ${filterGrupo===g.id?g.cor:'#e2e8f0'}`,background:filterGrupo===g.id?g.cor:'#fff',color:filterGrupo===g.id?'#fff':'#64748b'}}>
+            G{g.id} ({frentes.filter(f=>f.grupo===g.id).length})</button>
         ))}
       </div>
-
-      {/* ── FRENTES TAB ── */}
-      {tab === "frentes" && (
-        <div style={{padding:20}}>
-          {/* Filter */}
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-            <button onClick={() => setFilterGrupo(0)}
-              style={{padding:"4px 12px",borderRadius:20,fontSize:10.5,fontWeight:700,cursor:"pointer",
-                border:`1.5px solid ${filterGrupo===0?"#3b82f6":"#e2e8f0"}`,
-                background:filterGrupo===0?"#3b82f6":"#fff",color:filterGrupo===0?"#fff":"#64748b"}}>
-              Todos ({frentes.length})
-            </button>
-            {GRUPOS.map(g => (
-              <button key={g.id} onClick={() => setFilterGrupo(g.id)}
-                style={{padding:"4px 12px",borderRadius:20,fontSize:10.5,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",
-                  border:`1.5px solid ${filterGrupo===g.id?g.cor:"#e2e8f0"}`,
-                  background:filterGrupo===g.id?g.cor:"#fff",color:filterGrupo===g.id?"#fff":"#64748b"}}>
-                G{g.id} ({frentes.filter(f=>f.grupo===g.id).length})
-              </button>
-            ))}
-          </div>
-
-          {/* Board */}
-          <div className="fb-scroll" style={{overflowX:"auto",overflowY:"auto",position:"relative",maxHeight:"calc(100vh - 185px)"}}>
-            <Arrows frentes={visFrente} refs={refs} show={showDeps} hov={hov}/>
-            <div style={{display:"flex",gap:14,alignItems:"flex-start",minWidth:shownGrupos.length*280,paddingBottom:8}}>
-              {shownGrupos.map(g => {
-                const gf = visFrente.filter(f => f.grupo === g.id);
-                const over = dragOver === g.id;
-                return (
-                  <div key={g.id}
-                    onDragOver={e => { e.preventDefault(); setDragOver(g.id); }}
-                    onDragLeave={() => setDragOver(null)}
-                    onDrop={e => {
-                      e.preventDefault();
-                      if (dragId.current) setFreentes(frentes.map(f => f.id===dragId.current ? {...f, grupo:g.id} : f));
-                      setDragOver(null);
-                    }}
-                    style={{flex:filterGrupo!==0?"1":"0 0 272px",minWidth:272,
-                      background:over?g.soft:"#f8fafc",
-                      border:`2px solid ${over?g.cor:g.border}`,
-                      borderRadius:12,overflow:"hidden",transition:"all .15s"}}>
-                    <div style={{padding:"9px 11px 7px",background:g.soft,borderBottom:`1px solid ${g.border}`,
-                      display:"flex",alignItems:"center",gap:7}}>
-                      <span style={{width:7,height:7,borderRadius:"50%",background:g.cor,flexShrink:0}}/>
-                      <span style={{fontSize:10.5,fontWeight:800,color:g.cor,flex:1,lineHeight:1.3}}>G{g.id} — {g.nome}</span>
-                      <span style={{fontSize:9.5,padding:"1px 6px",borderRadius:20,
-                        background:`${g.cor}22`,color:g.cor,fontWeight:700}}>{gf.length}</span>
-                    </div>
-                    <div style={{padding:"7px 7px",display:"flex",flexDirection:"column",gap:6}}>
-                      {gf.map(f => (
-                        <FCard key={f.id} f={f} g={g} all={frentes} refs={refs}
-                          hov={hov} setHov={setHov}
-                          onEdit={setEditing}
-                          onDel={id => { if (confirm("Remover esta frente?")) setFreentes(frentes.filter(f => f.id !== id)); }}
-                          onDrill={setDrill}
-                          dragH={dragH}/>
-                      ))}
-                      {gf.length === 0 && (
-                        <div style={{padding:"18px 0",textAlign:"center",color:"#cbd5e1",fontSize:11}}>
-                          {over ? "Soltar aqui" : "Arraste frentes aqui"}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── ROADMAP TAB ── */}
-      {tab === "roadmap" && (
-        <div style={{padding:20}}>
-          {/* Filters */}
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-            {[["all","Todos"], ["trello","Trello"], ["manual","Manual"]].map(([v, l]) => (
-              <button key={v} onClick={() => { setFilterSrc(v); setActiveFrente(null); }}
-                style={{padding:"4px 12px",borderRadius:20,fontSize:10.5,fontWeight:700,cursor:"pointer",
-                  border:`1.5px solid ${filterSrc===v&&!activeFrente?"#3b82f6":"#e2e8f0"}`,
-                  background:filterSrc===v&&!activeFrente?"#3b82f6":"#fff",
-                  color:filterSrc===v&&!activeFrente?"#fff":"#64748b"}}>
-                {l} ({v==="all"?allItems.length:allItems.filter(i=>i.source===v).length})
-              </button>
-            ))}
-            <span style={{fontSize:10,color:"#94a3b8",marginLeft:4}}>
-              Arrastar barra = mover | Puxar extremidade = redimensionar | Clicar prioridade = editar
-            </span>
-          </div>
-
-          {/* Stats */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
-            {[
-              ["Total",  allItems.length,                              "#1e293b"],
-              ["Trello", allItems.filter(i=>i.source==="trello").length, "#3b82f6"],
-              ["Manual", allItems.filter(i=>i.source==="manual").length, "#8b5cf6"],
-              ["Grupos", [...new Set(allItems.map(i=>i.group))].length,  "#f59e0b"],
-            ].map(([l, v, c]) => (
-              <div key={l} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:10,padding:"12px 16px"}}>
-                <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
-                <div style={{fontSize:10.5,color:"#94a3b8",marginTop:2}}>{l}</div>
+      <div className="fb-scroll" style={{overflowX:'auto',overflowY:'auto',position:'relative',maxHeight:'calc(100vh - 185px)'}}>
+        <Arrows frentes={visFrente} refs={refs} show={showDeps} hov={hov}/>
+        <div style={{display:'flex',gap:14,alignItems:'flex-start',minWidth:shownGrupos.length*280,paddingBottom:8}}>
+          {shownGrupos.map(g=>{
+            const gf=visFrente.filter(f=>f.grupo===g.id),over=dragOver===g.id;
+            return(<div key={g.id}
+              onDragOver={e=>{e.preventDefault();setDragOver(g.id);}}
+              onDragLeave={()=>setDragOver(null)}
+              onDrop={e=>{e.preventDefault();if(dragId.current)setFreentes(frentes.map(f=>f.id===dragId.current?{...f,grupo:g.id}:f));setDragOver(null);}}
+              style={{flex:filterGrupo!==0?'1':'0 0 272px',minWidth:272,background:over?g.soft:'#f8fafc',border:`2px solid ${over?g.cor:g.border}`,borderRadius:12,overflow:'hidden',transition:'all .15s'}}>
+              <div style={{padding:'9px 11px 7px',background:g.soft,borderBottom:`1px solid ${g.border}`,display:'flex',alignItems:'center',gap:7}}>
+                <span style={{width:7,height:7,borderRadius:'50%',background:g.cor,flexShrink:0}}/>
+                <span style={{fontSize:10.5,fontWeight:800,color:g.cor,flex:1,lineHeight:1.3}}>G{g.id} — {g.nome}</span>
+                <span style={{fontSize:9.5,padding:'1px 6px',borderRadius:20,background:`${g.cor}22`,color:g.cor,fontWeight:700}}>{gf.length}</span>
               </div>
-            ))}
-          </div>
-
-          <RoadmapBoard items={roadmapItems} onPatch={patchItem}/>
+              <div style={{padding:'7px 7px',display:'flex',flexDirection:'column',gap:6}}>
+                {gf.map(f=><FCard key={f.id} f={f} g={g} all={frentes} refs={refs} hov={hov} setHov={setHov} onEdit={setEditing} onDel={id=>{if(confirm('Remover?'))setFreentes(frentes.filter(f=>f.id!==id));}} onDrill={setDrill} dragH={dragH}/>)}
+                {gf.length===0&&<div style={{padding:'18px 0',textAlign:'center',color:'#cbd5e1',fontSize:11}}>{over?'Soltar aqui':'Arraste frentes aqui'}</div>}
+              </div>
+            </div>);})}
         </div>
-      )}
+      </div>
+    </div>}
 
-      {/* ── MODALS ── */}
-      {editing !== null && (
-        <EditModal f={editing} all={frentes} onSave={saveFrente} onClose={() => setEditing(null)}/>
-      )}
-      {drill && (
-        <DrillPanel f={drill} all={frentes} onClose={() => setDrill(null)} onOpenRoadmap={openRoadmap}/>
-      )}
-    </div>
-  );
+    {/* ROADMAP TAB */}
+    {tab==='roadmap'&&<div style={{padding:20}}>
+
+      {/* Stats bar */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:16}}>
+        {[
+          ['Total ativo',allItems.filter(i=>i.active).length,'#1e293b'],
+          ['Validar Publicado',allItems.filter(i=>i.status==='Validar no Publicado').length,'#ef4444'],
+          ['Em andamento',allItems.filter(i=>['Em andamento','Em teste'].includes(i.status)).length,'#22c55e'],
+          ['Aguardando',allItems.filter(i=>['Aguardando Aprovação','Aprovado'].includes(i.status)).length,'#3b82f6'],
+          ['Pendente',allItems.filter(i=>['Pendente','Backlog'].includes(i.status)).length,'#f59e0b'],
+        ].map(([l,v,c])=>(
+          <div key={l} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',cursor:'pointer'}} onClick={()=>{
+            if(l==='Validar Publicado')setFilterStatus('validar');
+            else if(l==='Em andamento')setFilterStatus('andamento');
+            else if(l==='Aguardando')setFilterStatus('pendente');
+            else if(l==='Pendente')setFilterStatus('pendente');
+            else setFilterStatus('active');
+            setActiveFrente(null);setFilterFeature('all');
+          }}>
+            <div style={{fontSize:20,fontWeight:800,color:c}}>{v}</div>
+            <div style={{fontSize:9.5,color:'#94a3b8',marginTop:2}}>{l}</div>
+          </div>))}
+      </div>
+
+      {/* Filters */}
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+        <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>Status</span>
+        {[['active','Ativos'],['andamento','Em andamento'],['validar','Validar Publicado'],['pendente','Pendente/Aguardando'],['all','Todos']].map(([v,l])=>(
+          <button key={v} onClick={()=>{setFilterStatus(v);setActiveFrente(null);setFilterFeature('all');}}
+            style={{padding:'3px 10px',borderRadius:20,fontSize:10.5,fontWeight:700,cursor:'pointer',border:`1.5px solid ${filterStatus===v&&!activeFrente?'#3b82f6':'#e2e8f0'}`,background:filterStatus===v&&!activeFrente?'#3b82f6':'#fff',color:filterStatus===v&&!activeFrente?'#fff':'#64748b',whiteSpace:'nowrap'}}>
+            {l}</button>))}
+        <div style={{width:1,height:16,background:'#e2e8f0',margin:'0 4px'}}/>
+        <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>Feature</span>
+        <select value={activeFrente?activeFrente.titulo:filterFeature} onChange={e=>{setFilterFeature(e.target.value);setActiveFrente(null);}}
+          style={{fontSize:11,border:'1.5px solid #e2e8f0',borderRadius:8,padding:'4px 8px',background:'#fff',color:'#475569',outline:'none'}}>
+          <option value="all">Todas as áreas</option>
+          {features.map(f=><option key={f}>{f}</option>)}
+        </select>
+        <span style={{fontSize:9.5,color:'#94a3b8',marginLeft:'auto'}}>{roadmapItems.length} cards • Clicar = detalhes • Arrastar barra = mover no tempo</span>
+      </div>
+
+      <RoadmapBoard items={roadmapItems} onPatch={patchItem} onCardClick={setSelectedCard}/>
+    </div>}
+
+    {/* MODALS */}
+    {editing!==null&&<EditModal f={editing} all={frentes} onSave={saveFrente} onClose={()=>setEditing(null)}/>}
+    {drill&&<DrillPanel f={drill} all={frentes} onClose={()=>setDrill(null)} onOpenRoadmap={openRoadmap}/>}
+    {selectedCard&&<CardDetail card={selectedCard} onClose={()=>setSelectedCard(null)}/>}
+  </div>);
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
