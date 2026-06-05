@@ -116,7 +116,7 @@ const RISCO_S={CRITICO:{bg:"#fef2f2",text:"#dc2626",dot:"#ef4444"},ALTO:{bg:"#ff
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "2.0";
+const APP_VERSION = "3.0";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -357,7 +357,7 @@ function CardDetail({card,onClose}){
 // ─── ROADMAP BOARD ───────────────────────────────────────────
 const COL_W=72, LABEL_W=280;
 
-function RoadmapBoard({items,onPatch,onCardClick}){
+function RoadmapBoard({items,onPatch,onCardClick,onMoveCard}){
   const [dragOverGroup,setDragOverGroup]=useState(null);
   const [editCell,setEditCell]=useState(null);
   const [editVal,setEditVal]=useState('');
@@ -461,6 +461,12 @@ function RoadmapBoard({items,onPatch,onCardClick}){
                     <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{item.status}
                   </span>
                   {item.isRedor&&<span style={{fontSize:8,fontWeight:700,padding:'1px 5px',borderRadius:20,background:'#fef2f2',color:'#b91c1c',whiteSpace:'nowrap'}}>Rede D'Or</span>}
+                  {onMoveCard&&<button onClick={e=>{e.stopPropagation();onMoveCard(item);}}
+                    style={{fontSize:8.5,padding:'1px 7px',borderRadius:20,border:'1px solid #e2e8f0',background:'#fff',color:'#64748b',cursor:'pointer',fontWeight:600,whiteSpace:'nowrap'}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor='#3b82f6';e.currentTarget.style.color='#3b82f6';}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor='#e2e8f0';e.currentTarget.style.color='#64748b';}}>
+                    ↕ frente
+                  </button>}
                   {item.url&&<a href={item.url} target="_blank" rel="noreferrer" style={{fontSize:9,color:'#94a3b8',textDecoration:'none'}} title="Abrir no Trello" onClick={e=>e.stopPropagation()}>↗</a>}
                 </div>
               </div>
@@ -488,6 +494,103 @@ function RoadmapBoard({items,onPatch,onCardClick}){
           })}
         </div>);
       })}
+    </div>
+  </div>);
+}
+
+// ─── MACRO VIEW ──────────────────────────────────────────────
+function MacroView({items,frentes,onDrillDown}){
+  const rows=useMemo(()=>frentes.map(f=>{
+    const fc=items.filter(i=>i.feature===f.titulo||i.group===f.titulo);
+    if(!fc.length)return null;
+    const s=Math.min(...fc.map(c=>c.startMonth||CURRENT_MONTH));
+    const e=Math.max(...fc.map(c=>c.endMonth||Math.min(12,CURRENT_MONTH+1)));
+    const sc={};fc.forEach(c=>{sc[c.status]=(sc[c.status]||0)+1;});
+    return{...f,fc,s,e,sc};
+  }).filter(Boolean),[items,frentes]);
+
+  const COL=80,LBL=300;
+  return(<div style={{overflowX:'auto',maxHeight:'calc(100vh - 300px)'}}>
+    <div style={{minWidth:LBL+COL*12}}>
+      <div style={{display:'grid',gridTemplateColumns:`${LBL}px repeat(12,${COL}px)`,background:'#f8fafc',borderBottom:'2px solid #e2e8f0',position:'sticky',top:0,zIndex:5}}>
+        <div style={{padding:'10px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',borderRight:'1px solid #e2e8f0',letterSpacing:'.05em'}}>Frente de Ação — {CURRENT_YEAR}</div>
+        {MONTHS.map((m,i)=><div key={m} style={{padding:'10px 4px',textAlign:'center',fontSize:10,fontWeight:700,borderRight:'1px solid #e2e8f0',color:i+1===CURRENT_MONTH?'#3b82f6':'#94a3b8',background:i+1===CURRENT_MONTH?'#eff6ff':undefined}}>
+          {m}{i+1===CURRENT_MONTH&&<div style={{width:4,height:4,background:'#3b82f6',borderRadius:'50%',margin:'2px auto 0'}}/>}
+        </div>)}
+      </div>
+      {rows.map(f=>(
+        <div key={f.id} onClick={()=>onDrillDown(f)}
+          style={{display:'grid',gridTemplateColumns:`${LBL}px repeat(12,${COL}px)`,borderBottom:'1px solid #f1f5f9',minHeight:60,cursor:'pointer',background:'#fff',transition:'background .1s'}}
+          onMouseEnter={e=>e.currentTarget.style.background=`${f.cor}06`}
+          onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
+          <div style={{padding:'10px 16px',borderRight:'1px solid #e2e8f0',display:'flex',flexDirection:'column',justifyContent:'center',gap:5}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{width:24,height:24,borderRadius:6,background:f.cor,color:'#fff',fontWeight:800,fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{f.num}</span>
+              <span style={{fontSize:13,fontWeight:700,color:'#1e293b'}}>{f.titulo}</span>
+            </div>
+            <div style={{display:'flex',gap:5,alignItems:'center',paddingLeft:32,flexWrap:'wrap'}}>
+              {Object.entries(f.sc).slice(0,2).map(([s,n])=>{
+                const ss=STATUS_STYLE[s]||STATUS_STYLE['Pendente'];
+                return<span key={s} style={{fontSize:9,padding:'1px 6px',borderRadius:20,background:ss.bg,color:ss.text,fontWeight:600,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:3}}>
+                  <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{s} ({n})</span>;
+              })}
+              <span style={{fontSize:9,color:'#94a3b8'}}>{f.fc.length} cards →</span>
+            </div>
+          </div>
+          {MONTHS.map((_,mi)=>{
+            const mo=mi+1,active=mo>=f.s&&mo<=f.e,isS=mo===f.s,isE=mo===f.e;
+            return<div key={mi} style={{borderRight:'1px solid #f1f5f9',display:'flex',alignItems:'center',padding:'0 3px',background:mi+1===CURRENT_MONTH?`${f.cor}06`:undefined}}>
+              {active&&<div style={{height:32,width:'100%',background:f.cor,opacity:0.88,position:'relative',
+                borderRadius:`${isS?'8px':'0'} ${isE?'8px':'0'} ${isE?'8px':'0'} ${isS?'8px':'0'}`,
+                marginLeft:isS?3:0,marginRight:isE?3:0,boxShadow:`0 2px 8px ${f.cor}40`}}>
+                {isS&&<span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',fontSize:9,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',pointerEvents:'none'}}>
+                  {f.e>f.s?`${MONTHS[f.s-1]}–${MONTHS[f.e-1]}`:MONTHS[f.s-1]}
+                </span>}
+              </div>}
+            </div>;
+          })}
+        </div>
+      ))}
+      {rows.length===0&&<div style={{textAlign:'center',padding:'48px 0',color:'#94a3b8',fontSize:13}}>
+        Nenhuma frente com cards. Importe o JSON do Trello primeiro.
+      </div>}
+    </div>
+  </div>);
+}
+
+// ─── MOVE FRENTE MODAL ────────────────────────────────────────
+function MoveModal({card,frentes,onMove,onClose}){
+  const current=frentes.find(f=>f.titulo===card.feature||f.titulo===card.group);
+  return(<div style={{position:'fixed',inset:0,background:'#00000066',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+    <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:500,maxHeight:'80vh',overflow:'auto',boxShadow:'0 24px 60px #0003'}}>
+      <div style={{padding:'20px 24px 16px',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+        <div>
+          <div style={{fontWeight:800,fontSize:15,color:'#1e293b'}}>Mover para outra Frente</div>
+          <div style={{fontSize:12,color:'#64748b',marginTop:4,lineHeight:1.4,maxWidth:380}}>{card.title}</div>
+        </div>
+        <button onClick={onClose} style={{border:'none',background:'none',fontSize:22,cursor:'pointer',color:'#94a3b8'}}>×</button>
+      </div>
+      <div style={{padding:'16px 24px'}}>
+        {current&&<>
+          <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:8}}>Frente atual</div>
+          <div style={{padding:'10px 14px',borderRadius:10,background:`${current.cor}15`,border:`1.5px solid ${current.cor}`,marginBottom:16,display:'flex',alignItems:'center',gap:10}}>
+            <span style={{width:28,height:28,borderRadius:7,background:current.cor,color:'#fff',fontWeight:800,fontSize:12,display:'flex',alignItems:'center',justifyContent:'center'}}>{current.num}</span>
+            <span style={{fontSize:14,fontWeight:700,color:'#1e293b'}}>{current.titulo}</span>
+          </div>
+        </>}
+        <div style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',marginBottom:8}}>Mover para</div>
+        <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:340,overflowY:'auto'}}>
+          {frentes.filter(f=>f.titulo!==card.feature&&f.titulo!==card.group).map(f=>(
+            <button key={f.id} onClick={()=>{onMove(card.id,f.titulo);onClose();}}
+              style={{padding:'10px 14px',borderRadius:9,background:'#f8fafc',border:'1.5px solid #e2e8f0',display:'flex',alignItems:'center',gap:10,cursor:'pointer',textAlign:'left',transition:'all .1s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background=`${f.cor}12`;e.currentTarget.style.borderColor=f.cor;}}
+              onMouseLeave={e=>{e.currentTarget.style.background='#f8fafc';e.currentTarget.style.borderColor='#e2e8f0';}}>
+              <span style={{width:26,height:26,borderRadius:6,background:f.cor,color:'#fff',fontWeight:800,fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{f.num}</span>
+              <span style={{fontSize:13,fontWeight:500,color:'#1e293b'}}>{f.titulo}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   </div>);
 }
@@ -561,6 +664,8 @@ function App(){
   const [filterStatus,setFilterStatus]=useState('active');
   const [filterFeature,setFilterFeature]=useState('all');
   const [selectedCard,setSelectedCard]=useState(null);
+  const [roadmapView,setRoadmapView]=useState('macro');
+  const [moveCardModal,setMoveCardModal]=useState(null);
 
   const refs=useRef({});
   const dragId=useRef(null);
@@ -587,7 +692,39 @@ function App(){
     setFreentes(updated);
   };
 
-  const openRoadmap=f=>{setActiveFrente(f);setFilterFeature(f.titulo);setTab('roadmap');setDrill(null);};
+  const openRoadmap=f=>{setActiveFrente(f);setFilterFeature(f.titulo);setTab('roadmap');setRoadmapView('detail');setDrill(null);};
+
+  const saveState=()=>{
+    const data={version:'3.0',savedAt:new Date().toISOString(),trelloItems,overlay,frentes,boardName};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;
+    a.download=`hospp-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();URL.revokeObjectURL(url);
+  };
+
+  const restoreFileRef=useRef(null);
+  const restoreState=()=>restoreFileRef.current?.click();
+  const onRestoreFile=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        if(d.trelloItems){setTrelloRaw(d.trelloItems);LS.set('hospp:trello',d.trelloItems);}
+        if(d.overlay){setOverlay(d.overlay);}
+        if(d.frentes){setFreentes(d.frentes);}
+        if(d.boardName){setBoardName(d.boardName);LS.set('hospp:boardName',d.boardName);}
+        alert('Estado restaurado com sucesso!');
+      }catch{alert('Arquivo inválido.');}
+    };
+    reader.readAsText(file);
+    e.target.value='';
+  };
+
+  const moveCardToFrente=(cardId,frenteTitulo)=>{
+    patchItem(cardId,{feature:frenteTitulo,group:frenteTitulo});
+  };
 
   const allItems=useMemo(()=>trelloItems.map(item=>{
     const ov=overlay[item.id];if(!ov)return item;
@@ -645,6 +782,13 @@ function App(){
           </button>
           <button onClick={()=>setEditing({})} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'none',background:'#3b82f6',color:'#fff',cursor:'pointer'}}>+ Nova Frente</button>
         </>}
+        <button onClick={saveState} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#475569',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
+          💾 Salvar
+        </button>
+        <button onClick={restoreState} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#475569',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
+          📂 Restaurar
+        </button>
+        <input ref={restoreFileRef} type="file" accept=".json" style={{display:'none'}} onChange={onRestoreFile}/>
         <button onClick={()=>{if(confirm('Importar novo JSON? Cards atuais serão substituídos (edições mantidas).')){{setTrelloRaw([]);LS.set('hospp:trello',[]);}}}} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',cursor:'pointer'}}>
           Novo JSON
         </button>
@@ -710,12 +854,51 @@ function App(){
             else if(l==='Pendente')setFilterStatus('pendente');
             else setFilterStatus('active');
             setActiveFrente(null);
+            setRoadmapView('detail');
           }}>
             <div style={{fontSize:20,fontWeight:800,color:c}}>{v}</div>
             <div style={{fontSize:9.5,color:'#94a3b8',marginTop:2}}>{l}</div>
           </div>))}
       </div>
 
+      {/* Toggle Macro / Detalhada */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{display:'flex',background:'#f1f5f9',borderRadius:10,padding:3,gap:2}}>
+            <button onClick={()=>setRoadmapView('macro')}
+              style={{padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',border:'none',transition:'all .15s',
+                background:roadmapView==='macro'?'#fff':'transparent',
+                color:roadmapView==='macro'?'#1e293b':'#94a3b8',
+                boxShadow:roadmapView==='macro'?'0 1px 4px #0001':'none'}}>
+              Visão Macro
+            </button>
+            <button onClick={()=>setRoadmapView('detail')}
+              style={{padding:'6px 16px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',border:'none',transition:'all .15s',
+                background:roadmapView==='detail'?'#fff':'transparent',
+                color:roadmapView==='detail'?'#1e293b':'#94a3b8',
+                boxShadow:roadmapView==='detail'?'0 1px 4px #0001':'none'}}>
+              Visão Detalhada
+            </button>
+          </div>
+          {roadmapView==='macro'&&<span style={{fontSize:11,color:'#94a3b8'}}>Clique numa frente para ver os cards</span>}
+        </div>
+        {roadmapView==='detail'&&activeFrente&&(
+          <button onClick={()=>{setActiveFrente(null);setFilterFeature('all');setRoadmapView('macro');}}
+            style={{padding:'5px 12px',borderRadius:20,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
+            ← Voltar para Macro
+          </button>
+        )}
+      </div>
+
+      {/* MACRO VIEW */}
+      {roadmapView==='macro'&&(
+        <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,overflow:'hidden'}}>
+          <MacroView items={allItems} frentes={frentes} onDrillDown={f=>{setActiveFrente(f);setFilterFeature(f.titulo);setRoadmapView('detail');}}/>
+        </div>
+      )}
+
+      {/* DETAIL VIEW */}
+      {roadmapView==='detail'&&<>
       {/* Filters */}
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
         <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>Status</span>
@@ -730,16 +913,18 @@ function App(){
           <option value="all">Todas as áreas</option>
           {features.map(f=><option key={f}>{f}</option>)}
         </select>
-        <span style={{fontSize:9.5,color:'#94a3b8',marginLeft:'auto'}}>{roadmapItems.length} cards • Clicar = detalhes • Arrastar barra = mover no tempo</span>
+        <span style={{fontSize:9.5,color:'#94a3b8',marginLeft:'auto'}}>{roadmapItems.length} cards • Clicar = detalhes • Arrastar = mover tempo • ↕ = trocar frente</span>
       </div>
 
-      <RoadmapBoard items={roadmapItems} onPatch={patchItem} onCardClick={setSelectedCard}/>
+      <RoadmapBoard items={roadmapItems} onPatch={patchItem} onCardClick={setSelectedCard} onMoveCard={setMoveCardModal}/>
+      </>}
     </div>}
 
     {/* MODALS */}
     {editing!==null&&<EditModal f={editing} all={frentes} onSave={saveFrente} onClose={()=>setEditing(null)}/>}
     {drill&&<DrillPanel f={drill} all={frentes} onClose={()=>setDrill(null)} onOpenRoadmap={openRoadmap}/>}
     {selectedCard&&<CardDetail card={selectedCard} onClose={()=>setSelectedCard(null)}/>}
+    {moveCardModal&&<MoveModal card={moveCardModal} frentes={frentes} onMove={moveCardToFrente} onClose={()=>setMoveCardModal(null)}/>}
   </div>);
 }
 
