@@ -116,7 +116,7 @@ const RISCO_S={CRITICO:{bg:"#fef2f2",text:"#dc2626",dot:"#ef4444"},ALTO:{bg:"#ff
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "3.0";
+const APP_VERSION = "3.1";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -138,7 +138,27 @@ const LS={
   }
 })();
 
-// ─── TRELLO PARSER ───────────────────────────────────────────
+const FEATURE_TO_FRENTE = {
+  'Chamados':                'Novas Funcionalidades',
+  'Cadastros':               'Novas Funcionalidades',
+  'Dashboards & Relatórios': 'Dashboards Dinâmicos',
+  'Integrações':             'Integração CMMS e Fabricantes',
+  'Bugs':                    'Correção de Bugs',
+  'Arquitetura':             'Arquitetura e Modelo de Dados',
+  'Acessos & Usuários':      'Novas Funcionalidades',
+  'Layout & UX':             'Novas Funcionalidades',
+  'Segurança':               'Segurança e Disaster Recovery',
+  'IA':                      'IA Smart',
+  'Manutenção':              'Suporte e Manutenção',
+  'Outros':                  'Novas Funcionalidades',
+};
+
+function getFrenteTitulo(item){
+  if(item.frenteTitulo) return item.frenteTitulo;
+  if(item.group && FRENTES_INIT.some(f=>f.titulo===item.group)) return item.group;
+  if(item.feature && FRENTES_INIT.some(f=>f.titulo===item.feature)) return item.feature;
+  return FEATURE_TO_FRENTE[item.feature] || FEATURE_TO_FRENTE[item.group] || 'Novas Funcionalidades';
+}
 function parseTrello(json){
   const board=typeof json==='string'?JSON.parse(json):json;
   const lists={};
@@ -501,7 +521,7 @@ function RoadmapBoard({items,onPatch,onCardClick,onMoveCard}){
 // ─── MACRO VIEW ──────────────────────────────────────────────
 function MacroView({items,frentes,onDrillDown}){
   const rows=useMemo(()=>frentes.map(f=>{
-    const fc=items.filter(i=>i.feature===f.titulo||i.group===f.titulo);
+    const fc=items.filter(i=>getFrenteTitulo(i)===f.titulo);
     if(!fc.length)return null;
     const s=Math.min(...fc.map(c=>c.startMonth||CURRENT_MONTH));
     const e=Math.max(...fc.map(c=>c.endMonth||Math.min(12,CURRENT_MONTH+1)));
@@ -723,7 +743,7 @@ function App(){
   };
 
   const moveCardToFrente=(cardId,frenteTitulo)=>{
-    patchItem(cardId,{feature:frenteTitulo,group:frenteTitulo});
+    patchItem(cardId,{frenteTitulo,feature:frenteTitulo,group:frenteTitulo});
   };
 
   const allItems=useMemo(()=>trelloItems.map(item=>{
@@ -733,13 +753,11 @@ function App(){
 
   const roadmapItems=useMemo(()=>{
     let items=allItems;
-    // Status filter
     if(filterStatus==='active')items=items.filter(i=>i.active);
     else if(filterStatus==='validar')items=items.filter(i=>i.status==='Validar no Publicado');
     else if(filterStatus==='andamento')items=items.filter(i=>['Em andamento','Aprovado','Em teste'].includes(i.status));
     else if(filterStatus==='pendente')items=items.filter(i=>['Pendente','Aguardando Aprovação','Backlog'].includes(i.status));
-    // Feature filter
-    if(activeFrente)items=items.filter(i=>i.feature===activeFrente.titulo||i.group===activeFrente.titulo);
+    if(activeFrente)items=items.filter(i=>getFrenteTitulo(i)===activeFrente.titulo);
     else if(filterFeature!=='all')items=items.filter(i=>i.feature===filterFeature||i.group===filterFeature);
     return items;
   },[allItems,filterStatus,filterFeature,activeFrente]);
