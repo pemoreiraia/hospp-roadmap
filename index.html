@@ -116,7 +116,7 @@ const RISCO_S={CRITICO:{bg:"#fef2f2",text:"#dc2626",dot:"#ef4444"},ALTO:{bg:"#ff
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "3.2";
+const APP_VERSION = "3.3";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -919,6 +919,38 @@ function App(){
 
       {/* DETAIL VIEW */}
       {roadmapView==='detail'&&<>
+
+      {/* Frente banner — só aparece quando vem de drill down */}
+      {activeFrente&&(()=>{
+        const g=GRUPOS.find(x=>x.id===activeFrente.grupo)||GRUPOS[0];
+        const rs=RISCO_S[activeFrente.risco]||RISCO_S.MEDIO;
+        const ps=PRIOR_S[activeFrente.prioridade]||PRIOR_S.MEDIA;
+        return(
+          <div style={{background:`${g.cor}10`,border:`1.5px solid ${g.cor}40`,borderRadius:12,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:14}}>
+            <div style={{width:40,height:40,borderRadius:10,background:g.cor,color:'#fff',fontWeight:800,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              {activeFrente.num}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                <span style={{fontWeight:800,fontSize:15,color:'#1e293b'}}>{activeFrente.titulo}</span>
+                <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:g.cor,color:'#fff',fontWeight:700}}>G{g.id} — {g.nome}</span>
+                <span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:ps.bg,color:ps.text,fontWeight:700}}>{activeFrente.prioridade}</span>
+                <span style={{fontSize:10,padding:'2px 7px',borderRadius:20,background:rs.bg,color:rs.text,fontWeight:700,display:'flex',alignItems:'center',gap:3}}>
+                  <span style={{width:5,height:5,borderRadius:'50%',background:rs.dot,display:'inline-block'}}/>
+                  {activeFrente.risco}
+                </span>
+              </div>
+              <div style={{fontSize:12,color:'#64748b'}}>{activeFrente.desc}</div>
+            </div>
+            <button
+              title="Voltar para o board de Frentes de Ação"
+              onClick={()=>{setActiveFrente(null);setFilterFeature('all');setRoadmapView('macro');setTab('frentes');}}
+              style={{padding:'7px 14px',borderRadius:8,border:`1.5px solid ${g.cor}`,background:'#fff',color:g.cor,fontWeight:700,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}>
+              ← Frentes
+            </button>
+          </div>
+        );
+      })()}
       {/* Filters */}
       <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
         <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>Status</span>
