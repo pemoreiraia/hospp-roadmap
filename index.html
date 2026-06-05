@@ -123,11 +123,12 @@ const MODULOS_INIT = [
   {id:"m6",  num:6,  titulo:"Integrações",                 desc:"CMMS, fabricantes, Rede D'Or, GE, Siemens e outros parceiros",                             cor:"#14b8a6", status:"Em andamento"},
   {id:"m7",  num:7,  titulo:"Dashboards & Relatórios",     desc:"Visualização, BI, Zoho, dashboards dinâmicos e relatórios gerenciais",                     cor:"#f97316", status:"Em andamento"},
   {id:"m8",  num:8,  titulo:"Venda de Produtos / Conta Azul",desc:"Integração financeira, faturamento, NF-e e Conta Azul",                                  cor:"#6366f1", status:"Não iniciado"},
-  {id:"m9",  num:9,  titulo:"Atualização de Connect",      desc:"App e portal de acesso externo para clientes e técnicos de campo",                         cor:"#0891b2", status:"Não iniciado"},
-  {id:"m10", num:10, titulo:"IA Smart",                    desc:"IA analítica sobre chamados, base instalada e contratos",                                   cor:"#7c3aed", status:"Em andamento"},
-  {id:"m11", num:11, titulo:"IA Avançada",                 desc:"IA preditiva, co-piloto operacional e higienização de dados",                               cor:"#059669", status:"Não iniciado"},
-  {id:"m12", num:12, titulo:"Infraestrutura & Segurança",  desc:"Arquitetura, DR, LGPD, performance e migração de stack",                                    cor:"#dc2626", status:"Em andamento"},
-  {id:"m13", num:13, titulo:"Manutenção & Sustentação",    desc:"Correção de bugs, ajustes e suporte contínuo da plataforma",                               cor:"#64748b", status:"Em andamento"},
+  {id:"m9a", num:9,  titulo:"Produto Connect",              desc:"Portal e produto Connect — funcionalidades e evolução da plataforma Connect",            cor:"#0891b2", status:"Em andamento"},
+  {id:"m9b", num:10, titulo:"App Mobile",                   desc:"Aplicativo mobile para técnicos de campo e acesso externo via app",                      cor:"#6d28d9", status:"Não iniciado"},
+  {id:"m10", num:11, titulo:"IA Smart",                     desc:"IA analítica sobre chamados, base instalada e contratos",                                cor:"#7c3aed", status:"Em andamento"},
+  {id:"m11", num:12, titulo:"IA Avançada",                  desc:"IA preditiva, co-piloto operacional e higienização de dados",                            cor:"#059669", status:"Não iniciado"},
+  {id:"m12", num:13, titulo:"Infraestrutura & Segurança",   desc:"Arquitetura, DR, LGPD, performance e migração de stack",                                cor:"#dc2626", status:"Em andamento"},
+  {id:"m13", num:14, titulo:"Manutenção & Sustentação",     desc:"Correção de bugs, ajustes e suporte contínuo da plataforma",                            cor:"#64748b", status:"Em andamento"},
 ];
 
 // Regras de mapeamento automático card → módulo (ordem importa — primeiro match ganha)
@@ -136,7 +137,8 @@ const MODULE_RULES = [
   ["m10", ['ia ','inteligência artificial','ia smart','machine learning','anomalia']],
   ["m6",  ['integra','cmms','ge healthcare','siemens','rede d\'or','webhook','erp','ploomes']],
   ["m8",  ['conta azul','faturamento','nfe','nota fiscal','financeiro','cobrança','venda']],
-  ["m9",  ['connect','portal','app ','mobile','aplicativo','cliente externo','acesso externo']],
+  ["m9b", ['app ','mobile','aplicativo','app mobile','app técnico']],
+  ["m9a", ['connect','portal connect','cliente externo','acesso externo']],
   ["m7",  ['dashboard','relatório','gráfico','indicador','kpi','zoho','analytics','report','exportar']],
   ["m12", ['arquitetura','infraestrutura','segurança','lgpd','disaster','performance','migração','microsserviço']],
   ["m3",  ['contrato','sla','cobertura','vigência','reajuste','aditivo','renovação']],
@@ -158,7 +160,7 @@ function getModuloId(item){
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "3.9.1";
+const APP_VERSION = "4.0";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
