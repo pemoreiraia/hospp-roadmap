@@ -116,7 +116,7 @@ const RISCO_S={CRITICO:{bg:"#fef2f2",text:"#dc2626",dot:"#ef4444"},ALTO:{bg:"#ff
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "3.1";
+const APP_VERSION = "3.2";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -220,8 +220,10 @@ function FCard({f,g,all,refs,hov,setHov,onEdit,onDel,onDrill,dragH}){
   const rs=RISCO_S[f.risco]||RISCO_S.MEDIO,ps=PRIOR_S[f.prioridade]||PRIOR_S.MEDIA;
   const isH=hov===f.id,isDep=f.dependeDe.includes(hov||'')||all.some(x=>x.id===hov&&x.dependeDe.includes(f.id));
   return(<div ref={el=>refs.current[f.id]=el} draggable {...dragH(f)}
+    onClick={()=>onDrill(f)}
     onMouseEnter={()=>setHov(f.id)} onMouseLeave={()=>setHov(null)}
-    style={{background:'#fff',border:`1.5px solid ${isH?g.cor:isDep?'#c7d2fe':'#e2e8f0'}`,borderRadius:10,padding:'10px 12px',cursor:'grab',userSelect:'none',position:'relative',boxShadow:isH?`0 4px 16px ${g.cor}30`:isDep?'0 2px 8px #6366f120':'0 1px 3px #0001',transition:'all .15s'}}>
+    title="Clique para ver o roadmap desta frente"
+    style={{background:'#fff',border:`1.5px solid ${isH?g.cor:isDep?'#c7d2fe':'#e2e8f0'}`,borderRadius:10,padding:'10px 12px',cursor:'pointer',userSelect:'none',position:'relative',boxShadow:isH?`0 4px 16px ${g.cor}30`:isDep?'0 2px 8px #6366f120':'0 1px 3px #0001',transition:'all .15s'}}>
     <div style={{display:'flex',gap:8,marginBottom:7}}>
       <div style={{width:26,height:26,borderRadius:7,background:g.cor,color:'#fff',fontWeight:800,fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{f.num}</div>
       <div style={{flex:1,minWidth:0}}>
@@ -239,9 +241,9 @@ function FCard({f,g,all,refs,hov,setHov,onEdit,onDel,onDrill,dragH}){
       <span style={{color:'#64748b',fontWeight:600}}>Dep: </span>{f.dependeDe.map(d=>`#${d}`).join(', ')}
     </div>}
     <div style={{position:'absolute',top:7,right:7,display:'flex',gap:3,opacity:isH?1:0,transition:'opacity .15s'}}>
-      <button onClick={()=>onDrill(f)} style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>↗</button>
-      <button onClick={()=>onEdit(f)} style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>✎</button>
-      <button onClick={()=>onDel(f.id)} style={{width:22,height:22,borderRadius:5,border:'1px solid #fee2e2',background:'#fff',cursor:'pointer',fontSize:11,color:'#ef4444',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+      <button title="Ver detalhes e abrir o roadmap desta frente" onClick={e=>{e.stopPropagation();onDrill(f);}} style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>↗</button>
+      <button title="Editar título, grupo, prioridade e dependências" onClick={e=>{e.stopPropagation();onEdit(f);}} style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>✎</button>
+      <button title="Remover permanentemente esta frente" onClick={e=>{e.stopPropagation();onDel(f.id);}} style={{width:22,height:22,borderRadius:5,border:'1px solid #fee2e2',background:'#fff',cursor:'pointer',fontSize:11,color:'#ef4444',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
     </div>
   </div>);
 }
@@ -277,7 +279,7 @@ function EditModal({f,all,onSave,onClose}){
           </div></div>
       </div>
       <div style={{padding:'10px 22px 18px',display:'flex',justifyContent:'flex-end',gap:8,borderTop:'1px solid #f1f5f9'}}>
-        <button onClick={onClose} style={{padding:'7px 16px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',fontWeight:600,cursor:'pointer',fontSize:12}}>Cancelar</button>
+        <button onClick={onClose} title='Cancelar sem salvar' style={{padding:'7px 16px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',fontWeight:600,cursor:'pointer',fontSize:12}}>Cancelar</button>
         <button onClick={()=>{if(!form.titulo.trim())return alert('Título obrigatório');onSave(form);onClose();}} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#3b82f6',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:12}}>{isNew?'Criar':'Salvar'}</button>
       </div>
     </div>
@@ -296,7 +298,7 @@ function DrillPanel({f,all,onClose,onOpenRoadmap}){
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
           <div style={{width:34,height:34,borderRadius:9,background:g.cor,color:'#fff',fontWeight:800,fontSize:15,display:'flex',alignItems:'center',justifyContent:'center'}}>{f.num}</div>
           <div style={{flex:1}}><div style={{fontWeight:800,fontSize:15,color:'#1e293b'}}>{f.titulo}</div><div style={{fontSize:11,color:g.cor,fontWeight:600}}>Grupo {g.id} — {g.nome}</div></div>
-          <button onClick={onClose} style={{border:'none',background:'none',fontSize:22,cursor:'pointer',color:'#94a3b8'}}>×</button>
+          <button title='Fechar painel' onClick={onClose} style={{border:'none',background:'none',fontSize:22,cursor:'pointer',color:'#94a3b8'}}>×</button>
         </div>
         <p style={{fontSize:13,color:'#475569',lineHeight:1.6,margin:0}}>{f.desc}</p>
       </div>
@@ -327,7 +329,7 @@ function DrillPanel({f,all,onClose,onOpenRoadmap}){
         <div style={{borderRadius:12,border:'2px dashed #e2e8f0',padding:'22px 18px',textAlign:'center'}}>
           <div style={{fontWeight:700,fontSize:14,color:'#1e293b',marginBottom:5}}>Roadmap desta Frente</div>
           <div style={{fontSize:12,color:'#94a3b8',lineHeight:1.6,marginBottom:14}}>Ver cards do Trello relacionados a <strong>{f.titulo}</strong></div>
-          <button onClick={()=>onOpenRoadmap(f)} style={{padding:'8px 18px',borderRadius:8,background:g.cor,color:'#fff',fontWeight:700,fontSize:12,border:'none',cursor:'pointer'}}>Abrir Roadmap →</button>
+          <button onClick={()=>onOpenRoadmap(f)} title='Abrir roadmap detalhado com todos os cards desta frente' style={{padding:'8px 18px',borderRadius:8,background:g.cor,color:'#fff',fontWeight:700,fontSize:12,border:'none',cursor:'pointer'}}>Abrir Roadmap →</button>
         </div>
       </div>
     </div>
@@ -487,7 +489,7 @@ function RoadmapBoard({items,onPatch,onCardClick,onMoveCard}){
                     onMouseLeave={e=>{e.currentTarget.style.borderColor='#e2e8f0';e.currentTarget.style.color='#64748b';}}>
                     ↕ frente
                   </button>}
-                  {item.url&&<a href={item.url} target="_blank" rel="noreferrer" style={{fontSize:9,color:'#94a3b8',textDecoration:'none'}} title="Abrir no Trello" onClick={e=>e.stopPropagation()}>↗</a>}
+                  {item.url&&<a href={item.url} target="_blank" rel="noreferrer" style={{fontSize:9,color:'#94a3b8',textDecoration:'none'}} title="Abrir este card diretamente no Trello" onClick={e=>e.stopPropagation()}>↗</a>}
                 </div>
               </div>
 
@@ -540,7 +542,7 @@ function MacroView({items,frentes,onDrillDown}){
       </div>
       {rows.map(f=>(
         <div key={f.id} onClick={()=>onDrillDown(f)}
-          style={{display:'grid',gridTemplateColumns:`${LBL}px repeat(12,${COL}px)`,borderBottom:'1px solid #f1f5f9',minHeight:60,cursor:'pointer',background:'#fff',transition:'background .1s'}}
+          title='Clique para ver os cards desta frente no roadmap detalhado' style={{display:'grid',gridTemplateColumns:`${LBL}px repeat(12,${COL}px)`,borderBottom:'1px solid #f1f5f9',minHeight:60,cursor:'pointer',background:'#fff',transition:'background .1s'}}
           onMouseEnter={e=>e.currentTarget.style.background=`${f.cor}06`}
           onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
           <div style={{padding:'10px 16px',borderRight:'1px solid #e2e8f0',display:'flex',flexDirection:'column',justifyContent:'center',gap:5}}>
@@ -588,7 +590,7 @@ function MoveModal({card,frentes,onMove,onClose}){
           <div style={{fontWeight:800,fontSize:15,color:'#1e293b'}}>Mover para outra Frente</div>
           <div style={{fontSize:12,color:'#64748b',marginTop:4,lineHeight:1.4,maxWidth:380}}>{card.title}</div>
         </div>
-        <button onClick={onClose} style={{border:'none',background:'none',fontSize:22,cursor:'pointer',color:'#94a3b8'}}>×</button>
+        <button title='Fechar painel' onClick={onClose} style={{border:'none',background:'none',fontSize:22,cursor:'pointer',color:'#94a3b8'}}>×</button>
       </div>
       <div style={{padding:'16px 24px'}}>
         {current&&<>
@@ -790,24 +792,24 @@ function App(){
         {tab==='roadmap'&&activeFrente&&<>
           <span style={{color:'#cbd5e1'}}>/</span>
           <span style={{fontWeight:600,fontSize:11,color:'#3b82f6',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:160}}>#{activeFrente.num} {activeFrente.titulo}</span>
-          <button onClick={()=>{setActiveFrente(null);setFilterFeature('all');}} style={{fontSize:10,padding:'2px 7px',borderRadius:20,border:'1px solid #e2e8f0',background:'#fff',color:'#94a3b8',cursor:'pointer',flexShrink:0}}>× limpar</button>
+          <button title='Remover filtro de frente e ver todos os cards' onClick={()=>{setActiveFrente(null);setFilterFeature('all');}} style={{fontSize:10,padding:'2px 7px',borderRadius:20,border:'1px solid #e2e8f0',background:'#fff',color:'#94a3b8',cursor:'pointer',flexShrink:0}}>× limpar</button>
         </>}
       </div>
       <div style={{display:'flex',gap:6,flexShrink:0}}>
         {tab==='frentes'&&<>
-          <button onClick={()=>setShowDeps(d=>!d)} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,cursor:'pointer',border:`1.5px solid ${showDeps?'#3b82f6':'#e2e8f0'}`,background:showDeps?'#eff6ff':'#fff',color:showDeps?'#1d4ed8':'#64748b'}}>
+          <button title={showDeps?'Ocultar setas de dependência entre frentes':'Mostrar setas de dependência entre frentes'} onClick={()=>setShowDeps(d=>!d)} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,cursor:'pointer',border:`1.5px solid ${showDeps?'#3b82f6':'#e2e8f0'}`,background:showDeps?'#eff6ff':'#fff',color:showDeps?'#1d4ed8':'#64748b'}}>
             {showDeps?'Ocultar setas':'Mostrar setas'}
           </button>
-          <button onClick={()=>setEditing({})} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'none',background:'#3b82f6',color:'#fff',cursor:'pointer'}}>+ Nova Frente</button>
+          <button title='Criar uma nova frente de ação' onClick={()=>setEditing({})} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'none',background:'#3b82f6',color:'#fff',cursor:'pointer'}}>+ Nova Frente</button>
         </>}
-        <button onClick={saveState} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#475569',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
+        <button title='Baixar arquivo .json com todo o estado atual: cards, edições, frentes e posições' onClick={saveState} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#475569',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
           💾 Salvar
         </button>
-        <button onClick={restoreState} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#475569',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
+        <button title='Carregar arquivo .json salvo anteriormente e restaurar todo o estado' onClick={restoreState} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#475569',cursor:'pointer',display:'flex',alignItems:'center',gap:4}}>
           📂 Restaurar
         </button>
         <input ref={restoreFileRef} type="file" accept=".json" style={{display:'none'}} onChange={onRestoreFile}/>
-        <button onClick={()=>{if(confirm('Importar novo JSON? Cards atuais serão substituídos (edições mantidas).')){{setTrelloRaw([]);LS.set('hospp:trello',[]);}}}} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',cursor:'pointer'}}>
+        <button title='Importar novo arquivo JSON do Trello — substitui cards mas mantém edições' onClick={()=>{if(confirm('Importar novo JSON? Cards atuais serão substituídos (edições mantidas).')){{setTrelloRaw([]);LS.set('hospp:trello',[]);}}}} style={{padding:'5px 12px',borderRadius:7,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',cursor:'pointer'}}>
           Novo JSON
         </button>
       </div>
@@ -859,13 +861,13 @@ function App(){
       {/* Stats bar */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:16}}>
         {[
-          ['Total ativo',allItems.filter(i=>i.active).length,'#1e293b'],
-          ['Validar Publicado',allItems.filter(i=>i.status==='Validar no Publicado').length,'#ef4444'],
-          ['Em andamento',allItems.filter(i=>['Em andamento','Em teste'].includes(i.status)).length,'#22c55e'],
-          ['Aguardando',allItems.filter(i=>['Aguardando Aprovação','Aprovado'].includes(i.status)).length,'#3b82f6'],
-          ['Pendente',allItems.filter(i=>['Pendente','Backlog'].includes(i.status)).length,'#f59e0b'],
+          ['Total ativo',allItems.filter(i=>i.active).length,'#1e293b','Ver todos os cards ativos'],
+          ['Validar Publicado',allItems.filter(i=>i.status==='Validar no Publicado').length,'#ef4444','Ver cards aguardando validação no publicado'],
+          ['Em andamento',allItems.filter(i=>['Em andamento','Em teste'].includes(i.status)).length,'#22c55e','Ver cards em desenvolvimento ou em teste'],
+          ['Aguardando',allItems.filter(i=>['Aguardando Aprovação','Aprovado'].includes(i.status)).length,'#3b82f6','Ver cards aguardando aprovação ou aprovados'],
+          ['Pendente',allItems.filter(i=>['Pendente','Backlog'].includes(i.status)).length,'#f59e0b','Ver cards pendentes ou em backlog'],
         ].map(([l,v,c])=>(
-          <div key={l} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',cursor:'pointer'}} onClick={()=>{
+          <div key={l} title={l[3]||l[0]} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',cursor:'pointer'}} onClick={()=>{
             if(l==='Validar Publicado')setFilterStatus('validar');
             else if(l==='Em andamento')setFilterStatus('andamento');
             else if(l==='Aguardando')setFilterStatus('pendente');
@@ -901,7 +903,7 @@ function App(){
           {roadmapView==='macro'&&<span style={{fontSize:11,color:'#94a3b8'}}>Clique numa frente para ver os cards</span>}
         </div>
         {roadmapView==='detail'&&activeFrente&&(
-          <button onClick={()=>{setActiveFrente(null);setFilterFeature('all');setRoadmapView('macro');}}
+          <button title='Voltar para a visão consolidada das frentes de ação' onClick={()=>{setActiveFrente(null);setFilterFeature('all');setRoadmapView('macro');}}
             style={{padding:'5px 12px',borderRadius:20,fontSize:11,fontWeight:700,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
             ← Voltar para Macro
           </button>
