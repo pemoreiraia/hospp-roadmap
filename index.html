@@ -113,10 +113,52 @@ const FRENTES_INIT = [
 ];
 
 const RISCO_S={CRITICO:{bg:"#fef2f2",text:"#dc2626",dot:"#ef4444"},ALTO:{bg:"#fff7ed",text:"#c2410c",dot:"#f97316"},MEDIO:{bg:"#fefce8",text:"#a16207",dot:"#eab308"},BAIXO:{bg:"#f0fdf4",text:"#15803d",dot:"#22c55e"}};
+
+const MODULOS_INIT = [
+  {id:"m1",  num:1,  titulo:"Gestão de Chamados",          desc:"Fluxo completo de abertura, acompanhamento e encerramento de ordens de serviço",          cor:"#3b82f6", status:"Em andamento"},
+  {id:"m2",  num:2,  titulo:"Hierarquização",              desc:"Estrutura de usuários, perfis, permissões e níveis de acesso",                             cor:"#8b5cf6", status:"Em andamento"},
+  {id:"m3",  num:3,  titulo:"Contratos",                   desc:"Gestão de contratos, SLA, cobertura, vigência e aditivos",                                  cor:"#f59e0b", status:"Em andamento"},
+  {id:"m4",  num:4,  titulo:"Onboarding",                  desc:"Cadastro inicial de empresas, configuração e primeiro acesso à plataforma",                 cor:"#10b981", status:"Em andamento"},
+  {id:"m5",  num:5,  titulo:"Estruturação de Produtos",    desc:"Cadastro de equipamentos, modelos, fabricantes e base instalada",                          cor:"#ec4899", status:"Em andamento"},
+  {id:"m6",  num:6,  titulo:"Integrações",                 desc:"CMMS, fabricantes, Rede D'Or, GE, Siemens e outros parceiros",                             cor:"#14b8a6", status:"Em andamento"},
+  {id:"m7",  num:7,  titulo:"Dashboards & Relatórios",     desc:"Visualização, BI, Zoho, dashboards dinâmicos e relatórios gerenciais",                     cor:"#f97316", status:"Em andamento"},
+  {id:"m8",  num:8,  titulo:"Venda de Produtos / Conta Azul",desc:"Integração financeira, faturamento, NF-e e Conta Azul",                                  cor:"#6366f1", status:"Não iniciado"},
+  {id:"m9",  num:9,  titulo:"Atualização de Connect",      desc:"App e portal de acesso externo para clientes e técnicos de campo",                         cor:"#0891b2", status:"Não iniciado"},
+  {id:"m10", num:10, titulo:"IA Smart",                    desc:"IA analítica sobre chamados, base instalada e contratos",                                   cor:"#7c3aed", status:"Em andamento"},
+  {id:"m11", num:11, titulo:"IA Avançada",                 desc:"IA preditiva, co-piloto operacional e higienização de dados",                               cor:"#059669", status:"Não iniciado"},
+  {id:"m12", num:12, titulo:"Infraestrutura & Segurança",  desc:"Arquitetura, DR, LGPD, performance e migração de stack",                                    cor:"#dc2626", status:"Em andamento"},
+  {id:"m13", num:13, titulo:"Manutenção & Sustentação",    desc:"Correção de bugs, ajustes e suporte contínuo da plataforma",                               cor:"#64748b", status:"Em andamento"},
+];
+
+// Regras de mapeamento automático card → módulo (ordem importa — primeiro match ganha)
+const MODULE_RULES = [
+  ["m11", ['co-piloto','copiloto','higieniz','ia avançada','ia advanced','preditiv']],
+  ["m10", ['ia ','inteligência artificial','ia smart','machine learning','anomalia']],
+  ["m6",  ['integra','cmms','ge healthcare','siemens','rede d\'or','webhook','erp','ploomes']],
+  ["m8",  ['conta azul','faturamento','nfe','nota fiscal','financeiro','cobrança','venda']],
+  ["m9",  ['connect','portal','app ','mobile','aplicativo','cliente externo','acesso externo']],
+  ["m7",  ['dashboard','relatório','gráfico','indicador','kpi','zoho','analytics','report','exportar']],
+  ["m12", ['arquitetura','infraestrutura','segurança','lgpd','disaster','performance','migração','microsserviço']],
+  ["m3",  ['contrato','sla','cobertura','vigência','reajuste','aditivo','renovação']],
+  ["m2",  ['hierarq','permiss','nível de acesso','grupo de acesso','tipo de usuário','perfil de acesso']],
+  ["m4",  ['onboard','cadastro de empresa','novo cliente','nova empresa','configuração inicial','empresa de acesso']],
+  ["m5",  ['equipamento','modelo de equip','fabricante','patrimônio','número de série','base instalada','registro anvisa']],
+  ["m13", ['bug','erro','falha','correção','fix','problema','lentidão']],
+  ["m1",  ['chamado','ordem de serviço','os ','abertura','agendamento','técnico','manutenção corretiva','preventiva','solicitação']],
+];
+
+function getModuloId(item){
+  if(item.moduloId) return item.moduloId;
+  const text=(item.title||'').toLowerCase()+' '+(item.feature||'').toLowerCase()+' '+(item.listName||'').toLowerCase();
+  for(const [mid, kws] of MODULE_RULES){
+    if(kws.some(kw=>text.includes(kw))) return mid;
+  }
+  return 'sem-modulo';
+}
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "3.6";
+const APP_VERSION = "3.7";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -684,6 +726,195 @@ function MoveModal({card,frentes,onMove,onClose}){
   </div>);
 }
 
+// ─── MODULOS VIEW ─────────────────────────────────────────────
+function ModulosView({items, modulos, onUpdate, onAdd, onDelete, onDrillDown}){
+  const [editing, setEditing] = useState(null);
+
+  const modulosWithStats = useMemo(()=>modulos.map(m=>{
+    const mc = items.filter(i=>getModuloId(i)===m.id);
+    const active = mc.filter(i=>i.active);
+    const sc={};
+    active.forEach(i=>{sc[i.status]=(sc[i.status]||0)+1;});
+    const topStatus = Object.entries(sc).sort((a,b)=>b[1]-a[1])[0];
+    return {...m, total:mc.length, active:active.length, sc, topStatus};
+  }),[items,modulos]);
+
+  const semModulo = useMemo(()=>items.filter(i=>i.active&&getModuloId(i)==='sem-modulo'),[items]);
+
+  return(<div style={{padding:20}}>
+
+    {/* Stats */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
+      {[
+        ['Total módulos', modulos.length, '#1e293b'],
+        ['Cards mapeados', items.filter(i=>i.active&&getModuloId(i)!=='sem-modulo').length, '#3b82f6'],
+        ['Sem módulo', semModulo.length, '#f59e0b'],
+        ['Em andamento', modulos.filter(m=>m.status==='Em andamento').length, '#22c55e'],
+      ].map(([l,v,c])=>(
+        <div key={l} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 16px'}}>
+          <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
+          <div style={{fontSize:10.5,color:'#94a3b8',marginTop:2}}>{l}</div>
+        </div>
+      ))}
+    </div>
+
+    {/* Add button */}
+    <div style={{display:'flex',justifyContent:'flex-end',marginBottom:14}}>
+      <button onClick={()=>setEditing({})} title="Criar um novo módulo"
+        style={{padding:'7px 16px',borderRadius:8,fontSize:12,fontWeight:700,border:'none',background:'#3b82f6',color:'#fff',cursor:'pointer'}}>
+        + Novo Módulo
+      </button>
+    </div>
+
+    {/* Module grid */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14,marginBottom:20}}>
+      {modulosWithStats.map(m=>{
+        const ss = m.topStatus ? (STATUS_STYLE[m.topStatus[0]]||STATUS_STYLE['Pendente']) : null;
+        return(
+          <div key={m.id} onClick={()=>onDrillDown(m)}
+            title="Clique para ver os cards deste módulo no roadmap"
+            style={{background:'#fff',border:`1.5px solid #e2e8f0`,borderRadius:12,padding:'16px',cursor:'pointer',
+              transition:'all .15s',position:'relative'}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=m.cor;e.currentTarget.style.boxShadow=`0 4px 16px ${m.cor}25`;}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor='#e2e8f0';e.currentTarget.style.boxShadow='none';}}>
+
+            {/* Header */}
+            <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:10}}>
+              <div style={{width:36,height:36,borderRadius:9,background:m.cor,color:'#fff',fontWeight:800,fontSize:14,
+                display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{m.num}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,fontSize:13.5,color:'#1e293b',lineHeight:1.3}}>{m.titulo}</div>
+                <div style={{fontSize:11,color:'#64748b',marginTop:2,lineHeight:1.4,
+                  display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{m.desc}</div>
+              </div>
+            </div>
+
+            {/* Stats row */}
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+              <span style={{fontSize:11,fontWeight:700,color:m.cor}}>{m.active} cards ativos</span>
+              {m.total!==m.active&&<span style={{fontSize:10,color:'#94a3b8'}}>({m.total} total)</span>}
+              {m.topStatus&&ss&&(
+                <span style={{fontSize:9.5,padding:'2px 7px',borderRadius:20,background:ss.bg,color:ss.text,
+                  display:'flex',alignItems:'center',gap:3,fontWeight:600,marginLeft:'auto'}}>
+                  <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>
+                  {m.topStatus[0]} ({m.topStatus[1]})
+                </span>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            <div style={{height:4,background:'#f1f5f9',borderRadius:2,overflow:'hidden',marginBottom:10}}>
+              <div style={{height:'100%',background:m.cor,borderRadius:2,
+                width:`${Math.min(100,Math.round((m.active/Math.max(m.total,1))*100))}%`,
+                opacity:0.7,transition:'width .3s'}}/>
+            </div>
+
+            {/* Status badge */}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,
+                background: m.status==='Em andamento'?'#f0fdf4':m.status==='Concluído'?'#eff6ff':'#f8fafc',
+                color: m.status==='Em andamento'?'#166534':m.status==='Concluído'?'#1d4ed8':'#64748b'}}>
+                {m.status}
+              </span>
+              {m.active===0&&<span title="Este módulo não tem cards associados ainda"
+                style={{fontSize:9.5,color:'#f59e0b',fontWeight:600,cursor:'help'}}>⚠ Sem cards</span>}
+            </div>
+
+            {/* Action buttons */}
+            <div style={{position:'absolute',top:10,right:10,display:'flex',gap:3,opacity:0}}
+              className="modulo-actions"
+              onMouseEnter={e=>e.currentTarget.style.opacity=1}
+              onMouseLeave={e=>e.currentTarget.style.opacity=0}>
+              <button title="Editar este módulo" onClick={e=>{e.stopPropagation();setEditing(m);}}
+                style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>✎</button>
+              <button title="Remover este módulo" onClick={e=>{e.stopPropagation();if(confirm('Remover este módulo?'))onDelete(m.id);}}
+                style={{width:22,height:22,borderRadius:5,border:'1px solid #fee2e2',background:'#fff',cursor:'pointer',fontSize:11,color:'#ef4444',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Sem módulo warning */}
+    {semModulo.length>0&&(
+      <div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,padding:'14px 18px'}}>
+        <div style={{fontWeight:700,fontSize:13,color:'#92400e',marginBottom:8}}>
+          {semModulo.length} cards sem módulo associado
+        </div>
+        <div style={{fontSize:11,color:'#78350f',lineHeight:1.6}}>
+          Estes cards não foram classificados automaticamente. Acesse o Roadmap Detalhado e use o botão "↕ módulo" para classificá-los.
+        </div>
+      </div>
+    )}
+
+    {/* Edit modal */}
+    {editing!==null&&(
+      <ModuloEditModal modulo={editing} onSave={form=>{
+        if(form.id&&modulos.find(m=>m.id===form.id)) onUpdate(form);
+        else onAdd(form);
+        setEditing(null);
+      }} onClose={()=>setEditing(null)}/>
+    )}
+  </div>);
+}
+
+// ─── MODULO EDIT MODAL ───────────────────────────────────────
+function ModuloEditModal({modulo, onSave, onClose}){
+  const isNew=!modulo.id;
+  const [form,setForm]=useState({titulo:'',desc:'',cor:'#3b82f6',status:'Em andamento',...modulo});
+  const CORES=['#3b82f6','#8b5cf6','#f59e0b','#10b981','#ec4899','#14b8a6','#f97316','#6366f1','#0891b2','#7c3aed','#059669','#dc2626','#64748b'];
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
+  return(
+    <div style={{position:'fixed',inset:0,background:'#00000066',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:480,boxShadow:'0 20px 60px #0003'}}>
+        <div style={{padding:'18px 22px 14px',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <h2 style={{fontSize:15,fontWeight:800,color:'#1e293b',margin:0}}>{isNew?'Novo Módulo':'Editar Módulo'}</h2>
+          <button onClick={onClose} style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:'#94a3b8'}}>×</button>
+        </div>
+        <div style={{padding:'16px 22px',display:'flex',flexDirection:'column',gap:12}}>
+          <div>
+            <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Título *</label>
+            <input value={form.titulo} onChange={e=>set('titulo',e.target.value)}
+              style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 11px',fontSize:13,outline:'none'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Descrição</label>
+            <textarea value={form.desc} onChange={e=>set('desc',e.target.value)} rows={2}
+              style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 11px',fontSize:13,outline:'none',resize:'vertical'}}/>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Status</label>
+              <select value={form.status} onChange={e=>set('status',e.target.value)}
+                style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 10px',fontSize:12}}>
+                {['Não iniciado','Em andamento','Concluído','Pausado'].map(s=><option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Cor</label>
+              <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:4}}>
+                {CORES.map(c=>(
+                  <div key={c} onClick={()=>set('cor',c)} title={c}
+                    style={{width:20,height:20,borderRadius:5,background:c,cursor:'pointer',
+                      outline:form.cor===c?`2px solid ${c}`:'2px solid transparent',
+                      outlineOffset:2,transition:'outline .1s'}}/>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{padding:'10px 22px 18px',display:'flex',justifyContent:'flex-end',gap:8,borderTop:'1px solid #f1f5f9'}}>
+          <button onClick={onClose} style={{padding:'7px 16px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',fontWeight:600,cursor:'pointer',fontSize:12}}>Cancelar</button>
+          <button onClick={()=>{if(!form.titulo.trim())return alert('Título obrigatório');onSave(form);}}
+            style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#3b82f6',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:12}}>
+            {isNew?'Criar':'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── IMPORT SCREEN ───────────────────────────────────────────
 function ImportScreen({onImport, onRestore}){
   const [drag,setDrag]=useState(false);
@@ -789,6 +1020,7 @@ function ImportScreen({onImport, onRestore}){
 // ─── MAIN APP ────────────────────────────────────────────────
 function App(){
   const [frentes,setFrentesRaw]  =useState(()=>LS.get('hospp:frentes',FRENTES_INIT));
+  const [modulos,setModulosRaw]  =useState(()=>LS.get('hospp:modulos',MODULOS_INIT));
   const [trelloItems,setTrelloRaw]=useState(()=>LS.get('hospp:trello',[]));
   const [overlay,setOverlayRaw]  =useState(()=>LS.get('hospp:overlay',{}));
   const [boardName,setBoardName] =useState(()=>LS.get('hospp:boardName',null));
@@ -801,6 +1033,7 @@ function App(){
   const [dragOver,setDragOver]=useState(null);
   const [filterGrupo,setFilterGrupo]=useState(0);
   const [activeFrente,setActiveFrente]=useState(null);
+  const [activeModulo,setActiveModulo]=useState(null);
   const [filterStatus,setFilterStatus]=useState('active');
   const [filterFeature,setFilterFeature]=useState('all');
   const [selectedCard,setSelectedCard]=useState(null);
@@ -811,6 +1044,7 @@ function App(){
   const dragId=useRef(null);
 
   const setFreentes=v=>{setFrentesRaw(v);LS.set('hospp:frentes',v);};
+  const setModulos=v=>{setModulosRaw(v);LS.set('hospp:modulos',v);};
   const setOverlay=v=>{setOverlayRaw(v);LS.set('hospp:overlay',v);};
 
   const patchItem=useCallback((id,patch)=>{
@@ -834,8 +1068,14 @@ function App(){
 
   const openRoadmap=f=>{setActiveFrente(f);setFilterFeature(f.titulo);setTab('roadmap');setRoadmapView('detail');setDrill(null);};
 
+  const openRoadmapFromModulo=m=>{setActiveModulo(m);setActiveFrente(null);setFilterFeature('all');setTab('roadmap');setRoadmapView('detail');};
+
+  const moveCardToModulo=(cardId,moduloId)=>{
+    patchItem(cardId,{moduloId});
+  };
+
   const saveState=()=>{
-    const data={version:'3.0',savedAt:new Date().toISOString(),trelloItems,overlay,frentes,boardName};
+    const data={version:'3.7',savedAt:new Date().toISOString(),trelloItems,overlay,frentes,modulos,boardName};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;
@@ -854,6 +1094,7 @@ function App(){
         if(d.trelloItems){setTrelloRaw(d.trelloItems);LS.set('hospp:trello',d.trelloItems);}
         if(d.overlay){setOverlay(d.overlay);}
         if(d.frentes){setFreentes(d.frentes);}
+        if(d.modulos){setModulos(d.modulos);}
         if(d.boardName){setBoardName(d.boardName);LS.set('hospp:boardName',d.boardName);}
         alert('Estado restaurado com sucesso!');
       }catch{alert('Arquivo inválido.');}
@@ -879,10 +1120,11 @@ function App(){
     else if(filterStatus==='pendente')items=items.filter(i=>['Pendente','Aguardando Aprovação','Backlog'].includes(i.status));
     else if(filterStatus==='semest')items=items.filter(i=>i.active&&i.semEstimativa);
     else if(filterStatus!=='all')items=items.filter(i=>i.status===filterStatus);
-    if(activeFrente)items=items.filter(i=>getFrenteTitulo(i)===activeFrente.titulo);
+    if(activeModulo)items=items.filter(i=>getModuloId(i)===activeModulo.id);
+    else if(activeFrente)items=items.filter(i=>getFrenteTitulo(i)===activeFrente.titulo);
     else if(filterFeature!=='all')items=items.filter(i=>i.feature===filterFeature||i.group===filterFeature);
     return items;
-  },[allItems,filterStatus,filterFeature,activeFrente]);
+  },[allItems,filterStatus,filterFeature,activeFrente,activeModulo]);
 
   const features=useMemo(()=>[...new Set(allItems.map(i=>i.feature||i.group||'Outros'))].sort(),[allItems]);
   const hasData=trelloItems.length>0;
@@ -944,7 +1186,7 @@ function App(){
 
     {/* TABS */}
     <div style={{background:'#fff',borderBottom:'1px solid #e2e8f0',padding:'0 20px',display:'flex',gap:0}}>
-      {[['frentes',`Frentes (${frentes.length})`],['roadmap',`Roadmap — ${boardName||'Trello'} (${roadmapItems.length}/${allItems.length})`]].map(([id,lbl])=>(
+      {[['frentes',`Frentes (${frentes.length})`],['modulos',`Módulos (${modulos.length})`],['roadmap',`Roadmap — ${boardName||'Trello'} (${roadmapItems.length}/${allItems.length})`]].map(([id,lbl])=>(
         <button key={id} onClick={()=>setTab(id)} style={{padding:'10px 16px',fontSize:12,fontWeight:700,border:'none',borderBottom:`2px solid ${tab===id?'#3b82f6':'transparent'}`,background:'none',color:tab===id?'#3b82f6':'#94a3b8',cursor:'pointer',transition:'color .15s'}}>{lbl}</button>
       ))}
     </div>
@@ -981,6 +1223,16 @@ function App(){
         </div>
       </div>
     </div>}
+
+    {/* MODULOS TAB */}
+    {tab==='modulos'&&<ModulosView
+      items={allItems}
+      modulos={modulos}
+      onUpdate={m=>setModulos(modulos.map(x=>x.id===m.id?m:x))}
+      onAdd={m=>{const mx=Math.max(...modulos.map(x=>x.num),0);setModulos([...modulos,{...m,id:`m${Date.now()}`,num:mx+1}]);}}
+      onDelete={id=>setModulos(modulos.filter(m=>m.id!==id))}
+      onDrillDown={openRoadmapFromModulo}
+    />}
 
     {/* ROADMAP TAB */}
     {tab==='roadmap'&&<div style={{padding:20}}>
@@ -1047,7 +1299,31 @@ function App(){
       {/* DETAIL VIEW */}
       {roadmapView==='detail'&&<>
 
-      {/* Frente banner — só aparece quando vem de drill down */}
+      {/* Módulo banner — só aparece quando vem de drill down de módulo */}
+      {activeModulo&&(
+        <div style={{background:`${activeModulo.cor}10`,border:`1.5px solid ${activeModulo.cor}40`,borderRadius:12,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:14}}>
+          <div style={{width:40,height:40,borderRadius:10,background:activeModulo.cor,color:'#fff',fontWeight:800,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            {activeModulo.num}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+              <span style={{fontWeight:800,fontSize:15,color:'#1e293b'}}>{activeModulo.titulo}</span>
+              <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:activeModulo.cor,color:'#fff',fontWeight:700}}>Módulo</span>
+              <span style={{fontSize:10,padding:'2px 7px',borderRadius:20,
+                background:activeModulo.status==='Em andamento'?'#f0fdf4':'#f8fafc',
+                color:activeModulo.status==='Em andamento'?'#166534':'#64748b',fontWeight:700}}>
+                {activeModulo.status}
+              </span>
+            </div>
+            <div style={{fontSize:12,color:'#64748b'}}>{activeModulo.desc}</div>
+          </div>
+          <button title="Voltar para o board de Módulos"
+            onClick={()=>{setActiveModulo(null);setRoadmapView('macro');setTab('modulos');}}
+            style={{padding:'7px 14px',borderRadius:8,border:`1.5px solid ${activeModulo.cor}`,background:'#fff',color:activeModulo.cor,fontWeight:700,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}}>
+            ← Módulos
+          </button>
+        </div>
+      )}
       {activeFrente&&(()=>{
         const g=GRUPOS.find(x=>x.id===activeFrente.grupo)||GRUPOS[0];
         const rs=RISCO_S[activeFrente.risco]||RISCO_S.MEDIO;
