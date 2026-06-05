@@ -119,16 +119,17 @@ const MODULOS_INIT = [
   {id:"m2",  num:2,  titulo:"Hierarquização",              desc:"Estrutura de usuários, perfis, permissões e níveis de acesso",                             cor:"#8b5cf6", status:"Em andamento"},
   {id:"m3",  num:3,  titulo:"Contratos",                   desc:"Gestão de contratos, SLA, cobertura, vigência e aditivos",                                  cor:"#f59e0b", status:"Em andamento"},
   {id:"m4",  num:4,  titulo:"Onboarding",                  desc:"Cadastro inicial de empresas, configuração e primeiro acesso à plataforma",                 cor:"#10b981", status:"Em andamento"},
-  {id:"m5",  num:5,  titulo:"Estruturação de Produtos",    desc:"Cadastro de equipamentos, modelos, fabricantes e base instalada",                          cor:"#ec4899", status:"Em andamento"},
-  {id:"m6",  num:6,  titulo:"Integrações",                 desc:"CMMS, fabricantes, Rede D'Or, GE, Siemens e outros parceiros",                             cor:"#14b8a6", status:"Em andamento"},
-  {id:"m7",  num:7,  titulo:"Dashboards & Relatórios",     desc:"Visualização, BI, Zoho, dashboards dinâmicos e relatórios gerenciais",                     cor:"#f97316", status:"Em andamento"},
-  {id:"m8",  num:8,  titulo:"Venda de Produtos / Conta Azul",desc:"Integração financeira, faturamento, NF-e e Conta Azul",                                  cor:"#6366f1", status:"Não iniciado"},
-  {id:"m9a", num:9,  titulo:"Produto Connect",              desc:"Portal e produto Connect — funcionalidades e evolução da plataforma Connect",            cor:"#0891b2", status:"Em andamento"},
-  {id:"m9b", num:10, titulo:"App Mobile",                   desc:"Aplicativo mobile para técnicos de campo e acesso externo via app",                      cor:"#6d28d9", status:"Não iniciado"},
-  {id:"m10", num:11, titulo:"IA Smart",                     desc:"IA analítica sobre chamados, base instalada e contratos",                                cor:"#7c3aed", status:"Em andamento"},
-  {id:"m11", num:12, titulo:"IA Avançada",                  desc:"IA preditiva, co-piloto operacional e higienização de dados",                            cor:"#059669", status:"Não iniciado"},
-  {id:"m12", num:13, titulo:"Infraestrutura & Segurança",   desc:"Arquitetura, DR, LGPD, performance e migração de stack",                                cor:"#dc2626", status:"Em andamento"},
-  {id:"m13", num:14, titulo:"Manutenção & Sustentação",     desc:"Correção de bugs, ajustes e suporte contínuo da plataforma",                            cor:"#64748b", status:"Em andamento"},
+  {id:"m5",  num:5,  titulo:"Base Instalada e Equipamentos", desc:"Cadastro de equipamentos, modelos, fabricantes, patrimônio e base instalada",          cor:"#ec4899", status:"Em andamento"},
+  {id:"m5b", num:6,  titulo:"Estruturação de Produtos Pagos",desc:"Produtos pagos da plataforma — Care, Industry, Partner, Master e Association",          cor:"#f97316", status:"Não iniciado"},
+  {id:"m6",  num:7,  titulo:"Integrações",                   desc:"CMMS, fabricantes, Rede D'Or, GE, Siemens e outros parceiros",                           cor:"#14b8a6", status:"Em andamento"},
+  {id:"m7",  num:8,  titulo:"Dashboards & Relatórios",       desc:"Visualização, BI, Zoho, dashboards dinâmicos e relatórios gerenciais",                   cor:"#f59e0b", status:"Em andamento"},
+  {id:"m8",  num:9,  titulo:"Venda de Produtos / Conta Azul",desc:"Integração financeira, faturamento, NF-e e Conta Azul",                                  cor:"#6366f1", status:"Não iniciado"},
+  {id:"m9a", num:10, titulo:"Produto Connect",               desc:"Portal e produto Connect — funcionalidades e evolução da plataforma Connect",            cor:"#0891b2", status:"Em andamento"},
+  {id:"m9b", num:11, titulo:"App Mobile",                    desc:"Aplicativo mobile para técnicos de campo e acesso externo via app",                      cor:"#6d28d9", status:"Não iniciado"},
+  {id:"m10", num:12, titulo:"IA Smart",                      desc:"IA analítica sobre chamados, base instalada e contratos",                                cor:"#7c3aed", status:"Em andamento"},
+  {id:"m11", num:13, titulo:"IA Avançada",                   desc:"IA preditiva, co-piloto operacional e higienização de dados",                            cor:"#059669", status:"Não iniciado"},
+  {id:"m12", num:14, titulo:"Infraestrutura & Segurança",    desc:"Arquitetura, DR, LGPD, performance e migração de stack",                                cor:"#dc2626", status:"Em andamento"},
+  {id:"m13", num:15, titulo:"Manutenção & Sustentação",      desc:"Correção de bugs, ajustes e suporte contínuo da plataforma",                            cor:"#64748b", status:"Em andamento"},
 ];
 
 // Regras de mapeamento automático card → módulo (ordem importa — primeiro match ganha)
@@ -144,6 +145,7 @@ const MODULE_RULES = [
   ["m3",  ['contrato','sla','cobertura','vigência','reajuste','aditivo','renovação']],
   ["m2",  ['hierarq','permiss','nível de acesso','grupo de acesso','tipo de usuário','perfil de acesso']],
   ["m4",  ['onboard','cadastro de empresa','novo cliente','nova empresa','configuração inicial','empresa de acesso']],
+  ["m5b", ['care','industry','partner','master','association']],
   ["m5",  ['equipamento','modelo de equip','fabricante','patrimônio','número de série','base instalada','registro anvisa']],
   ["m13", ['bug','erro','falha','correção','fix','problema','lentidão']],
   ["m1",  ['chamado','ordem de serviço','os ','abertura','agendamento','técnico','manutenção corretiva','preventiva','solicitação']],
@@ -160,7 +162,7 @@ function getModuloId(item){
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "4.0";
+const APP_VERSION = "4.1";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
