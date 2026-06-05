@@ -135,7 +135,7 @@ const MODULOS_INIT = [
 // Regras de mapeamento automático card → módulo (ordem importa — primeiro match ganha)
 const MODULE_RULES = [
   ["m11", ['co-piloto','copiloto','higieniz','ia avançada','ia advanced','preditiv']],
-  ["m10", ['ia ','inteligência artificial','ia smart','machine learning','anomalia']],
+  ["m10", ['ia smart','chatbot','chat bot','inteligência artificial','machine learning','ia analítica','ia preditiva','firebase chatbot','logs firebase']],
   ["m6",  ['integra','cmms','ge healthcare','siemens','rede d\'or','webhook','erp','ploomes']],
   ["m8",  ['conta azul','faturamento','nfe','nota fiscal','financeiro','cobrança','venda']],
   ["m9b", ['app ','mobile','aplicativo','app mobile','app técnico']],
@@ -162,7 +162,7 @@ function getModuloId(item){
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "4.1";
+const APP_VERSION = "4.2";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -275,10 +275,23 @@ function parseTrello(json){
       if(cfi.idCustomField===cfFields.dias && cfi.value?.number)
         durDias=parseFloat(cfi.value.number);
       if(!durDias && cfi.idCustomField===cfFields.horas && cfi.value?.number)
-        durDias=parseFloat(cfi.value.number)/8; // 8h = 1 dia
+        durDias=parseFloat(cfi.value.number)/8;
     });
 
     const {startMonth,endMonth,semEstimativa}=calcMonths(status,durDias);
+
+    // Extract card number from title (#NNN) or idShort
+    const numMatch = c.name.match(/#(\d+)/);
+    const cardNumber = numMatch ? parseInt(numMatch[1]) : (c.idShort||null);
+
+    // Due date
+    const dueDate = c.due ? c.due.slice(0,10) : null;
+
+    // Last activity
+    const lastActivity = c.dateLastActivity ? c.dateLastActivity.slice(0,10) : null;
+
+    // Description — truncate to 500 chars for storage
+    const desc = (c.desc||'').trim().slice(0,500);
 
     return {
       id:'t-'+c.id, source:'trello', title:c.name, feature, status,
@@ -286,6 +299,7 @@ function parseTrello(json){
       priority:isPriority?'high':'medium', isRedor,
       startMonth, endMonth, semEstimativa,
       durDias, group:feature, listName,
+      cardNumber, dueDate, lastActivity, desc,
     };
   });
 }
