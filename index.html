@@ -116,7 +116,7 @@ const RISCO_S={CRITICO:{bg:"#fef2f2",text:"#dc2626",dot:"#ef4444"},ALTO:{bg:"#ff
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "3.4";
+const APP_VERSION = "3.5";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -159,10 +159,60 @@ function getFrenteTitulo(item){
   if(item.feature && FRENTES_INIT.some(f=>f.titulo===item.feature)) return item.feature;
   return FEATURE_TO_FRENTE[item.feature] || FEATURE_TO_FRENTE[item.group] || 'Novas Funcionalidades';
 }
+// ─── STATUS TOOLTIPS ─────────────────────────────────────────
+const STATUS_TOOLTIP = {
+  'Validar no Publicado': 'Já publicado em produção — aguardando confirmação de que está funcionando corretamente',
+  'Em andamento':         'Em desenvolvimento ativo agora pela equipe',
+  'Em teste':             'Desenvolvido e sendo testado internamente pela equipe ADEKZ',
+  'Aprovado':             'Aprovado para executar — aguardando entrar no planejamento da semana',
+  'Para publicar':        'Desenvolvimento concluído — aguardando ser publicado em produção',
+  'Aguardando Aprovação': 'Aguardando aprovação da Hospp para iniciar o desenvolvimento',
+  'Pendente':             'Na fila — ainda sem estimativa ou aprovação formal',
+  'Backlog':              'Registrado mas sem previsão de início definida',
+  'StandBy':              'Pausado temporariamente por alguma razão externa',
+  'Concluído':            'Finalizado e entregue em produção',
+  'Cancelado':            'Descartado — não será desenvolvido',
+  'Outros':               'Status não mapeado',
+};
+
+// Status → período padrão (fallback sem estimativa)
+const STATUS_MONTHS = {
+  'Validar no Publicado': {s:0, d:1},
+  'Para publicar':        {s:0, d:1},
+  'Em andamento':         {s:0, d:2},
+  'Em teste':             {s:0, d:2},
+  'Aprovado':             {s:1, d:2},
+  'Aguardando Aprovação': {s:2, d:3},
+  'Pendente':             {s:3, d:3},
+  'Backlog':              {s:4, d:4},
+  'StandBy':              {s:3, d:3},
+  'Outros':               {s:1, d:2},
+};
+
+function calcMonths(status, durDias){
+  const base = STATUS_MONTHS[status] || {s:1, d:2};
+  const start = Math.min(12, CURRENT_MONTH + base.s);
+  if(durDias && durDias > 0){
+    const months = Math.max(1, Math.ceil(durDias / 22)); // ~22 dias úteis/mês
+    const end = Math.min(12, start + months - 1);
+    return {startMonth: start, endMonth: end, semEstimativa: false};
+  }
+  const end = Math.min(12, start + base.d - 1);
+  return {startMonth: start, endMonth: end, semEstimativa: true};
+}
+
 function parseTrello(json){
   const board=typeof json==='string'?JSON.parse(json):json;
   const lists={};
   (board.lists||[]).forEach(l=>{lists[l.id]=l.name;});
+
+  // Map custom field ids
+  const cfFields={};
+  (board.customFields||[]).forEach(cf=>{
+    if(cf.name==='Duração (dias)') cfFields.dias=cf.id;
+    if(cf.name==='Duração (horas)') cfFields.horas=cf.id;
+  });
+
   return (board.cards||[]).filter(c=>!c.closed).map(c=>{
     const labels=(c.labels||[]).map(l=>l.name||'');
     const listName=lists[c.idList]||'';
@@ -172,12 +222,24 @@ function parseTrello(json){
     if(feature==='Outros'&&labels.some(l=>l.includes('Bug')))feature='Bugs';
     const isPriority=labels.includes('PRIORIDADE')||labels.includes('[PRI] Demanda de Cliente');
     const isRedor=labels.includes("[PRI] Integrações Rede D'Or");
+
+    // Extract duration from custom fields
+    let durDias=null;
+    (c.customFieldItems||[]).forEach(cfi=>{
+      if(cfi.idCustomField===cfFields.dias && cfi.value?.number)
+        durDias=parseFloat(cfi.value.number);
+      if(!durDias && cfi.idCustomField===cfFields.horas && cfi.value?.number)
+        durDias=parseFloat(cfi.value.number)/8; // 8h = 1 dia
+    });
+
+    const {startMonth,endMonth,semEstimativa}=calcMonths(status,durDias);
+
     return {
       id:'t-'+c.id, source:'trello', title:c.name, feature, status,
       active:ACTIVE_STATUSES.has(status), url:c.shortUrl||'',
       priority:isPriority?'high':'medium', isRedor,
-      startMonth:CURRENT_MONTH, endMonth:Math.min(12,CURRENT_MONTH+1),
-      group:feature, listName,
+      startMonth, endMonth, semEstimativa,
+      durDias, group:feature, listName,
     };
   });
 }
@@ -479,11 +541,13 @@ function RoadmapBoard({items,onPatch,onCardClick,onMoveCard}){
                   {item.title}
                 </div>
                 <div style={{display:'flex',gap:4,alignItems:'center',flexWrap:'wrap'}}>
-                  <span style={{fontSize:8.5,fontWeight:700,padding:'1px 5px',borderRadius:20,background:ss.bg,color:ss.text,display:'flex',alignItems:'center',gap:3,whiteSpace:'nowrap'}}>
+                  <span title={STATUS_TOOLTIP[item.status]||item.status} style={{fontSize:8.5,fontWeight:700,padding:'1px 5px',borderRadius:20,background:ss.bg,color:ss.text,display:'flex',alignItems:'center',gap:3,whiteSpace:'nowrap',cursor:'help'}}>
                     <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{item.status}
                   </span>
+                  {item.semEstimativa&&<span title="Período estimado automaticamente — este card ainda não tem duração definida no Trello" style={{fontSize:8,fontWeight:600,padding:'1px 5px',borderRadius:20,background:'#f8fafc',color:'#94a3b8',border:'1px dashed #cbd5e1',whiteSpace:'nowrap',cursor:'help'}}>Sem estimativa</span>}
                   {item.isRedor&&<span style={{fontSize:8,fontWeight:700,padding:'1px 5px',borderRadius:20,background:'#fef2f2',color:'#b91c1c',whiteSpace:'nowrap'}}>Rede D'Or</span>}
                   {onMoveCard&&<button onClick={e=>{e.stopPropagation();onMoveCard(item);}}
+                    title="Mover este card para outra frente de ação"
                     style={{fontSize:8.5,padding:'1px 7px',borderRadius:20,border:'1px solid #e2e8f0',background:'#fff',color:'#64748b',cursor:'pointer',fontWeight:600,whiteSpace:'nowrap'}}
                     onMouseEnter={e=>{e.currentTarget.style.borderColor='#3b82f6';e.currentTarget.style.color='#3b82f6';}}
                     onMouseLeave={e=>{e.currentTarget.style.borderColor='#e2e8f0';e.currentTarget.style.color='#64748b';}}>
@@ -499,9 +563,12 @@ function RoadmapBoard({items,onPatch,onCardClick,onMoveCard}){
                 const isS=mo===item.startMonth,isE=mo===item.endMonth;
                 return(<div key={mi} style={{borderRight:'1px solid #f1f5f9',display:'flex',alignItems:'center',padding:'0 2px',background:mi+1===CURRENT_MONTH?`${fc.bar}08`:undefined}}>
                   {active&&<div onMouseDown={e=>startDrag(e,item,'move')}
-                    style={{height:26,width:'100%',background:fc.bar,opacity:0.82,cursor:'grab',position:'relative',
+                    title={item.semEstimativa?'Período estimado automaticamente por status — sem duração definida no Trello':'Arrastar para mover no tempo'}
+                    style={{height:26,width:'100%',background:fc.bar,opacity:item.semEstimativa?0.45:0.82,cursor:'grab',position:'relative',
                       borderRadius:`${isS?'6px':'0'} ${isE?'6px':'0'} ${isE?'6px':'0'} ${isS?'6px':'0'}`,
-                      marginLeft:isS?2:0,marginRight:isE?2:0}}>
+                      marginLeft:isS?2:0,marginRight:isE?2:0,
+                      outline:item.semEstimativa?`2px dashed ${fc.bar}`:'none',
+                      outlineOffset:item.semEstimativa?'-2px':'0'}}>
                     {isS&&<span style={{position:'absolute',left:5,top:'50%',transform:'translateY(-50%)',fontSize:8,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',pointerEvents:'none'}}>
                       {item.endMonth>item.startMonth?`${MONTHS[item.startMonth-1]}–${MONTHS[item.endMonth-1]}`:MONTHS[item.startMonth-1]}
                     </span>}
@@ -553,7 +620,7 @@ function MacroView({items,frentes,onDrillDown}){
             <div style={{display:'flex',gap:5,alignItems:'center',paddingLeft:32,flexWrap:'wrap'}}>
               {Object.entries(f.sc).slice(0,2).map(([s,n])=>{
                 const ss=STATUS_STYLE[s]||STATUS_STYLE['Pendente'];
-                return<span key={s} style={{fontSize:9,padding:'1px 6px',borderRadius:20,background:ss.bg,color:ss.text,fontWeight:600,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:3}}>
+                return<span key={s} title={STATUS_TOOLTIP[s]||s} style={{fontSize:9,padding:'1px 6px',borderRadius:20,background:ss.bg,color:ss.text,fontWeight:600,whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:3,cursor:'help'}}>
                   <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{s} ({n})</span>;
               })}
               <span style={{fontSize:9,color:'#94a3b8'}}>{f.fc.length} cards →</span>
@@ -810,6 +877,7 @@ function App(){
     else if(filterStatus==='validar')items=items.filter(i=>i.status==='Validar no Publicado');
     else if(filterStatus==='andamento')items=items.filter(i=>['Em andamento','Aprovado','Em teste'].includes(i.status));
     else if(filterStatus==='pendente')items=items.filter(i=>['Pendente','Aguardando Aprovação','Backlog'].includes(i.status));
+    else if(filterStatus==='semest')items=items.filter(i=>i.active&&i.semEstimativa);
     if(activeFrente)items=items.filter(i=>getFrenteTitulo(i)===activeFrente.titulo);
     else if(filterFeature!=='all')items=items.filter(i=>i.feature===filterFeature||i.group===filterFeature);
     return items;
@@ -919,17 +987,17 @@ function App(){
       {/* Stats bar */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:16}}>
         {[
-          ['Total ativo',allItems.filter(i=>i.active).length,'#1e293b','Ver todos os cards ativos'],
-          ['Validar Publicado',allItems.filter(i=>i.status==='Validar no Publicado').length,'#ef4444','Ver cards aguardando validação no publicado'],
-          ['Em andamento',allItems.filter(i=>['Em andamento','Em teste'].includes(i.status)).length,'#22c55e','Ver cards em desenvolvimento ou em teste'],
-          ['Aguardando',allItems.filter(i=>['Aguardando Aprovação','Aprovado'].includes(i.status)).length,'#3b82f6','Ver cards aguardando aprovação ou aprovados'],
-          ['Pendente',allItems.filter(i=>['Pendente','Backlog'].includes(i.status)).length,'#f59e0b','Ver cards pendentes ou em backlog'],
-        ].map(([l,v,c])=>(
-          <div key={l} title={l[3]||l[0]} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',cursor:'pointer'}} onClick={()=>{
-            if(l==='Validar Publicado')setFilterStatus('validar');
-            else if(l==='Em andamento')setFilterStatus('andamento');
-            else if(l==='Aguardando')setFilterStatus('pendente');
-            else if(l==='Pendente')setFilterStatus('pendente');
+          ['Total ativo',allItems.filter(i=>i.active).length,'#1e293b','active','Ver todos os cards ativos'],
+          ['Validar Publicado',allItems.filter(i=>i.status==='Validar no Publicado').length,'#ef4444','validar','Ver cards aguardando validação no publicado'],
+          ['Em andamento',allItems.filter(i=>['Em andamento','Em teste'].includes(i.status)).length,'#22c55e','andamento','Ver cards em desenvolvimento ou em teste'],
+          ['Aguardando',allItems.filter(i=>['Aguardando Aprovação','Aprovado'].includes(i.status)).length,'#3b82f6','pendente','Ver cards aguardando aprovação ou aprovados'],
+          ['Sem estimativa',allItems.filter(i=>i.active&&i.semEstimativa).length,'#94a3b8','semest','Cards sem duração definida — período calculado automaticamente por status'],
+        ].map(([l,v,c,fkey,tip])=>(
+          <div key={l} title={tip} style={{background:'#fff',border:`1px solid ${filterStatus===fkey?c:'#e2e8f0'}`,borderRadius:10,padding:'10px 14px',cursor:'pointer',transition:'border-color .15s'}} onClick={()=>{
+            if(fkey==='semest'){setFilterStatus('semest');setActiveFrente(null);}
+            else if(fkey==='validar')setFilterStatus('validar');
+            else if(fkey==='andamento')setFilterStatus('andamento');
+            else if(fkey==='pendente')setFilterStatus('pendente');
             else setFilterStatus('active');
             setActiveFrente(null);
             setRoadmapView('detail');
