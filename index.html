@@ -116,7 +116,7 @@ const RISCO_S={CRITICO:{bg:"#fef2f2",text:"#dc2626",dot:"#ef4444"},ALTO:{bg:"#ff
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "3.5";
+const APP_VERSION = "3.6";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -878,6 +878,7 @@ function App(){
     else if(filterStatus==='andamento')items=items.filter(i=>['Em andamento','Aprovado','Em teste'].includes(i.status));
     else if(filterStatus==='pendente')items=items.filter(i=>['Pendente','Aguardando Aprovação','Backlog'].includes(i.status));
     else if(filterStatus==='semest')items=items.filter(i=>i.active&&i.semEstimativa);
+    else if(filterStatus!=='all')items=items.filter(i=>i.status===filterStatus);
     if(activeFrente)items=items.filter(i=>getFrenteTitulo(i)===activeFrente.titulo);
     else if(filterFeature!=='all')items=items.filter(i=>i.feature===filterFeature||i.group===filterFeature);
     return items;
@@ -1078,20 +1079,63 @@ function App(){
         );
       })()}
       {/* Filters */}
-      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
         <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>Status</span>
-        {[['active','Ativos'],['andamento','Em andamento'],['validar','Validar Publicado'],['pendente','Pendente/Aguardando'],['all','Todos']].map(([v,l])=>(
-          <button key={v} onClick={()=>setFilterStatus(v)}
-            style={{padding:'3px 10px',borderRadius:20,fontSize:10.5,fontWeight:700,cursor:'pointer',border:`1.5px solid ${filterStatus===v&&!activeFrente?'#3b82f6':'#e2e8f0'}`,background:filterStatus===v&&!activeFrente?'#3b82f6':'#fff',color:filterStatus===v&&!activeFrente?'#fff':'#64748b',whiteSpace:'nowrap'}}>
-            {l}</button>))}
-        <div style={{width:1,height:16,background:'#e2e8f0',margin:'0 4px'}}/>
+
+        {/* Todos */}
+        <button onClick={()=>setFilterStatus('all')}
+          style={{padding:'3px 10px',borderRadius:20,fontSize:10.5,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',
+            border:`1.5px solid ${filterStatus==='all'&&!activeFrente?'#3b82f6':'#e2e8f0'}`,
+            background:filterStatus==='all'&&!activeFrente?'#3b82f6':'#fff',
+            color:filterStatus==='all'&&!activeFrente?'#fff':'#64748b'}}>
+          Todos ({allItems.length})
+        </button>
+
+        {/* Ativos */}
+        <button onClick={()=>setFilterStatus('active')}
+          style={{padding:'3px 10px',borderRadius:20,fontSize:10.5,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',
+            border:`1.5px solid ${filterStatus==='active'&&!activeFrente?'#3b82f6':'#e2e8f0'}`,
+            background:filterStatus==='active'&&!activeFrente?'#3b82f6':'#fff',
+            color:filterStatus==='active'&&!activeFrente?'#fff':'#64748b'}}
+          title="Todos os cards em andamento — exclui Concluídos e Cancelados">
+          Ativos ({allItems.filter(i=>i.active).length})
+        </button>
+
+        <div style={{width:1,height:16,background:'#e2e8f0',margin:'0 2px'}}/>
+
+        {/* Dynamic status buttons from actual data */}
+        {[...new Set(allItems.map(i=>i.status))]
+          .filter(s=>s&&s!=='Outros')
+          .sort((a,b)=>{
+            const order=['Validar no Publicado','Para publicar','Em andamento','Em teste','Aprovado','Aguardando Aprovação','Pendente','Backlog','StandBy','Concluído','Cancelado'];
+            return (order.indexOf(a)||99)-(order.indexOf(b)||99);
+          })
+          .map(s=>{
+            const ss=STATUS_STYLE[s]||{bg:'#f8fafc',text:'#64748b',dot:'#94a3b8'};
+            const count=allItems.filter(i=>i.status===s).length;
+            const isActive=filterStatus===s&&!activeFrente;
+            return(
+              <button key={s} onClick={()=>setFilterStatus(s)}
+                title={STATUS_TOOLTIP[s]||s}
+                style={{padding:'3px 10px',borderRadius:20,fontSize:10.5,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',
+                  border:`1.5px solid ${isActive?ss.dot:'#e2e8f0'}`,
+                  background:isActive?ss.bg:'#fff',
+                  color:isActive?ss.text:'#64748b',
+                  display:'flex',alignItems:'center',gap:4}}>
+                {isActive&&<span style={{width:5,height:5,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>}
+                {s} ({count})
+              </button>
+            );
+          })}
+
+        <div style={{width:1,height:16,background:'#e2e8f0',margin:'0 2px'}}/>
         <span style={{fontSize:10,fontWeight:700,color:'#94a3b8',textTransform:'uppercase',whiteSpace:'nowrap'}}>Feature</span>
         <select value={activeFrente?activeFrente.titulo:filterFeature} onChange={e=>{setFilterFeature(e.target.value);setActiveFrente(null);}}
           style={{fontSize:11,border:'1.5px solid #e2e8f0',borderRadius:8,padding:'4px 8px',background:'#fff',color:'#475569',outline:'none'}}>
           <option value="all">Todas as áreas</option>
           {features.map(f=><option key={f}>{f}</option>)}
         </select>
-        <span style={{fontSize:9.5,color:'#94a3b8',marginLeft:'auto'}}>{roadmapItems.length} cards • Clicar = detalhes • Arrastar = mover tempo • ↕ = trocar frente</span>
+        <span style={{fontSize:9.5,color:'#94a3b8',marginLeft:'auto'}}>{roadmapItems.length} cards</span>
       </div>
 
       <RoadmapBoard items={roadmapItems} onPatch={patchItem} onCardClick={setSelectedCard} onMoveCard={setMoveCardModal}/>
