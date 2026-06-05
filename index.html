@@ -151,9 +151,19 @@ const MODULE_RULES = [
   ["m1",  ['chamado','ordem de serviço','os ','abertura','agendamento','técnico','manutenção corretiva','preventiva','solicitação']],
 ];
 
-function getModuloId(item){
+function getModuloId(item, modulosOverride){
   if(item.moduloId) return item.moduloId;
-  const text=(item.title||'').toLowerCase()+' '+(item.feature||'').toLowerCase()+' '+(item.listName||'').toLowerCase();
+  const text=(item.title||'').toLowerCase()+' '+(item.desc||'').toLowerCase()+' '+(item.feature||'').toLowerCase()+' '+(item.listName||'').toLowerCase();
+
+  // First check user-created modules with custom keywords (from localStorage)
+  const customModulos = modulosOverride || LS.get('hospp:modulos', []);
+  for(const m of customModulos){
+    if(!m.keywords) continue;
+    const kws = m.keywords.split(',').map(k=>k.trim().toLowerCase()).filter(Boolean);
+    if(kws.some(kw=>text.includes(kw))) return m.id;
+  }
+
+  // Then check built-in rules
   for(const [mid, kws] of MODULE_RULES){
     if(kws.some(kw=>text.includes(kw))) return mid;
   }
@@ -162,7 +172,7 @@ function getModuloId(item){
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "4.3";
+const APP_VERSION = "4.4";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1009,12 +1019,12 @@ function ModulosView({items, modulos, onUpdate, onAdd, onDelete, onDrillDown}){
 // ─── MODULO EDIT MODAL ───────────────────────────────────────
 function ModuloEditModal({modulo, onSave, onClose}){
   const isNew=!modulo.id;
-  const [form,setForm]=useState({titulo:'',desc:'',cor:'#3b82f6',status:'Em andamento',...modulo});
+  const [form,setForm]=useState({titulo:'',desc:'',cor:'#3b82f6',status:'Em andamento',keywords:'',...modulo});
   const CORES=['#3b82f6','#8b5cf6','#f59e0b','#10b981','#ec4899','#14b8a6','#f97316','#6366f1','#0891b2','#7c3aed','#059669','#dc2626','#64748b'];
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
   return(
     <div style={{position:'fixed',inset:0,background:'#00000066',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-      <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:480,boxShadow:'0 20px 60px #0003'}}>
+      <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:480,maxHeight:'90vh',overflow:'auto',boxShadow:'0 20px 60px #0003'}}>
         <div style={{padding:'18px 22px 14px',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <h2 style={{fontSize:15,fontWeight:800,color:'#1e293b',margin:0}}>{isNew?'Novo Módulo':'Editar Módulo'}</h2>
           <button onClick={onClose} style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:'#94a3b8'}}>×</button>
@@ -1029,6 +1039,17 @@ function ModuloEditModal({modulo, onSave, onClose}){
             <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Descrição</label>
             <textarea value={form.desc} onChange={e=>set('desc',e.target.value)} rows={2}
               style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 11px',fontSize:13,outline:'none',resize:'vertical'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>
+              Palavras-chave para mapeamento automático
+            </label>
+            <textarea value={form.keywords} onChange={e=>set('keywords',e.target.value)} rows={2}
+              placeholder="ex: gestão de estoque, estoque, inventário, almoxarifado"
+              style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 11px',fontSize:12,outline:'none',resize:'vertical',color:'#475569'}}/>
+            <div style={{fontSize:10,color:'#94a3b8',marginTop:3}}>
+              Separe por vírgula. Novos cards do Trello com essas palavras no título serão associados automaticamente a este módulo.
+            </div>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
             <div>
