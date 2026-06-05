@@ -158,7 +158,7 @@ function getModuloId(item){
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "3.7";
+const APP_VERSION = "3.9";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -727,8 +727,178 @@ function MoveModal({card,frentes,onMove,onClose}){
 }
 
 // ─── MODULOS VIEW ─────────────────────────────────────────────
+function ModuloCard({m, itemCount, activeCount, sc, topStatus, onEdit, onDelete, onDrillDown}){
+  const [hov, setHov] = useState(false);
+  const ss = topStatus ? (STATUS_STYLE[topStatus[0]]||STATUS_STYLE['Pendente']) : null;
+  return(
+    <div
+      onClick={()=>onDrillDown(m)}
+      onMouseEnter={()=>setHov(true)}
+      onMouseLeave={()=>setHov(false)}
+      title="Clique para ver os cards deste módulo no roadmap"
+      style={{background:'#fff',border:`1.5px solid ${hov?m.cor:'#e2e8f0'}`,borderRadius:12,padding:'16px',cursor:'pointer',
+        transition:'all .15s',position:'relative',
+        boxShadow:hov?`0 4px 16px ${m.cor}25`:'none'}}>
+
+      <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:10}}>
+        <div style={{width:36,height:36,borderRadius:9,background:m.cor,color:'#fff',fontWeight:800,fontSize:14,
+          display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{m.num}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:700,fontSize:13.5,color:'#1e293b',lineHeight:1.3}}>{m.titulo}</div>
+          <div style={{fontSize:11,color:'#64748b',marginTop:2,lineHeight:1.4,
+            display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{m.desc}</div>
+        </div>
+      </div>
+
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+        <span style={{fontSize:11,fontWeight:700,color:m.cor}}>{activeCount} cards ativos</span>
+        {itemCount!==activeCount&&<span style={{fontSize:10,color:'#94a3b8'}}>({itemCount} total)</span>}
+        {topStatus&&ss&&(
+          <span style={{fontSize:9.5,padding:'2px 7px',borderRadius:20,background:ss.bg,color:ss.text,
+            display:'flex',alignItems:'center',gap:3,fontWeight:600,marginLeft:'auto'}}>
+            <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>
+            {topStatus[0]} ({topStatus[1]})
+          </span>
+        )}
+      </div>
+
+      <div style={{height:4,background:'#f1f5f9',borderRadius:2,overflow:'hidden',marginBottom:10}}>
+        <div style={{height:'100%',background:m.cor,borderRadius:2,
+          width:`${Math.min(100,Math.round((activeCount/Math.max(itemCount,1))*100))}%`,
+          opacity:0.7,transition:'width .3s'}}/>
+      </div>
+
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,
+          background:m.status==='Em andamento'?'#f0fdf4':m.status==='Concluído'?'#eff6ff':'#f8fafc',
+          color:m.status==='Em andamento'?'#166534':m.status==='Concluído'?'#1d4ed8':'#64748b'}}>
+          {m.status}
+        </span>
+        {activeCount===0&&<span title="Este módulo não tem cards associados ainda"
+          style={{fontSize:9.5,color:'#f59e0b',fontWeight:600,cursor:'help'}}>Sem cards</span>}
+      </div>
+
+      {/* Action buttons — visíveis ao hover */}
+      <div style={{position:'absolute',top:10,right:10,display:'flex',gap:3,opacity:hov?1:0,transition:'opacity .15s'}}>
+        <button title="Editar este módulo" onClick={e=>{e.stopPropagation();onEdit(m);}}
+          style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,
+            display:'flex',alignItems:'center',justifyContent:'center'}}>✎</button>
+        <button title="Remover este módulo" onClick={e=>{e.stopPropagation();if(confirm('Remover este módulo?'))onDelete(m.id);}}
+          style={{width:22,height:22,borderRadius:5,border:'1px solid #fee2e2',background:'#fff',cursor:'pointer',fontSize:11,color:'#ef4444',
+            display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── MODULOS TIMELINE ────────────────────────────────────────
+function ModulosTimeline({items, modulos, onDrillDown}){
+  const COL=72, LBL=260;
+  const rows = useMemo(()=>modulos.map(m=>{
+    const mc = items.filter(i=>i.active && getModuloId(i)===m.id);
+    if(!mc.length) return {...m, mc:[], s:0, e:0, sc:{}, empty:true};
+    const s = Math.min(...mc.map(i=>i.startMonth||CURRENT_MONTH));
+    const e = Math.max(...mc.map(i=>i.endMonth||CURRENT_MONTH));
+    const sc={};
+    mc.forEach(i=>{sc[i.status]=(sc[i.status]||0)+1;});
+    // Segmented counts for progress
+    const done   = (sc['Validar no Publicado']||0)+(sc['Para publicar']||0);
+    const doing  = (sc['Em andamento']||0)+(sc['Em teste']||0)+(sc['Aprovado']||0);
+    const todo   = mc.length - done - doing;
+    return {...m, mc, s, e, sc, done, doing, todo, empty:false};
+  }),[items,modulos]);
+
+  return(
+    <div style={{overflowX:'auto',maxHeight:'calc(100vh - 280px)'}}>
+      <div style={{minWidth:LBL+COL*12}}>
+        {/* Header */}
+        <div style={{display:'grid',gridTemplateColumns:`${LBL}px repeat(12,${COL}px)`,
+          background:'#f8fafc',borderBottom:'2px solid #e2e8f0',position:'sticky',top:0,zIndex:5}}>
+          <div style={{padding:'10px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',
+            textTransform:'uppercase',borderRight:'1px solid #e2e8f0',letterSpacing:'.05em'}}>
+            Módulo — {new Date().getFullYear()}
+          </div>
+          {MONTHS.map((m,i)=>(
+            <div key={m} style={{padding:'10px 4px',textAlign:'center',fontSize:10,fontWeight:700,
+              borderRight:'1px solid #e2e8f0',
+              color:i+1===CURRENT_MONTH?'#3b82f6':'#94a3b8',
+              background:i+1===CURRENT_MONTH?'#eff6ff':undefined}}>
+              {m}{i+1===CURRENT_MONTH&&<div style={{width:4,height:4,background:'#3b82f6',borderRadius:'50%',margin:'2px auto 0'}}/>}
+            </div>
+          ))}
+        </div>
+
+        {/* Rows */}
+        {rows.map(m=>(
+          <div key={m.id} onClick={()=>!m.empty&&onDrillDown(m)}
+            style={{display:'grid',gridTemplateColumns:`${LBL}px repeat(12,${COL}px)`,
+              borderBottom:'1px solid #f1f5f9',minHeight:58,
+              cursor:m.empty?'default':'pointer',background:'#fff',transition:'background .1s'}}
+            onMouseEnter={e=>{if(!m.empty)e.currentTarget.style.background=`${m.cor}06`;}}
+            onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
+
+            {/* Label */}
+            <div style={{padding:'8px 14px',borderRight:'1px solid #e2e8f0',
+              display:'flex',flexDirection:'column',justifyContent:'center',gap:5}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{width:22,height:22,borderRadius:6,background:m.cor,color:'#fff',
+                  fontWeight:800,fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{m.num}</span>
+                <span style={{fontSize:12,fontWeight:700,color:'#1e293b'}}>{m.titulo}</span>
+              </div>
+              {!m.empty?(
+                <div style={{paddingLeft:30}}>
+                  {/* Segmented progress bar */}
+                  <div style={{display:'flex',height:5,borderRadius:3,overflow:'hidden',gap:1,marginBottom:3}}>
+                    {m.done>0&&<div style={{flex:m.done,background:'#22c55e',borderRadius:'3px 0 0 3px'}} title={`${m.done} validando/publicando`}/>}
+                    {m.doing>0&&<div style={{flex:m.doing,background:'#3b82f6'}} title={`${m.doing} em andamento`}/>}
+                    {m.todo>0&&<div style={{flex:m.todo,background:'#e2e8f0',borderRadius:'0 3px 3px 0'}} title={`${m.todo} pendente`}/>}
+                  </div>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                    {m.done>0&&<span style={{fontSize:8.5,color:'#16a34a',fontWeight:600}}>{m.done} publicando</span>}
+                    {m.doing>0&&<span style={{fontSize:8.5,color:'#2563eb',fontWeight:600}}>{m.doing} em andamento</span>}
+                    {m.todo>0&&<span style={{fontSize:8.5,color:'#94a3b8'}}>{m.todo} pendente</span>}
+                  </div>
+                </div>
+              ):(
+                <span style={{fontSize:10,color:'#f59e0b',paddingLeft:30,fontWeight:600}}>Sem cards ativos</span>
+              )}
+            </div>
+
+            {/* Timeline cells */}
+            {MONTHS.map((_,mi)=>{
+              const mo=mi+1;
+              const active = !m.empty && mo>=m.s && mo<=m.e;
+              const isS = mo===m.s, isE = mo===m.e;
+              return(
+                <div key={mi} style={{borderRight:'1px solid #f1f5f9',display:'flex',alignItems:'center',padding:'0 3px',
+                  background:mi+1===CURRENT_MONTH?`${m.cor}06`:undefined}}>
+                  {active&&(
+                    <div title={`${m.titulo}: ${MONTHS[m.s-1]}–${MONTHS[m.e-1]} • ${m.mc.length} cards ativos`}
+                      style={{height:32,width:'100%',background:m.cor,opacity:0.85,position:'relative',
+                        borderRadius:`${isS?'8px':'0'} ${isE?'8px':'0'} ${isE?'8px':'0'} ${isS?'8px':'0'}`,
+                        marginLeft:isS?3:0,marginRight:isE?3:0,
+                        boxShadow:`0 2px 8px ${m.cor}40`}}>
+                      {isS&&(
+                        <span style={{position:'absolute',left:8,top:'50%',transform:'translateY(-50%)',
+                          fontSize:9,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',pointerEvents:'none'}}>
+                          {m.e>m.s?`${MONTHS[m.s-1]}–${MONTHS[m.e-1]}`:MONTHS[m.s-1]} • {m.mc.length} cards
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ModulosView({items, modulos, onUpdate, onAdd, onDelete, onDrillDown}){
   const [editing, setEditing] = useState(null);
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'timeline'
 
   const modulosWithStats = useMemo(()=>modulos.map(m=>{
     const mc = items.filter(i=>getModuloId(i)===m.id);
@@ -736,12 +906,87 @@ function ModulosView({items, modulos, onUpdate, onAdd, onDelete, onDrillDown}){
     const sc={};
     active.forEach(i=>{sc[i.status]=(sc[i.status]||0)+1;});
     const topStatus = Object.entries(sc).sort((a,b)=>b[1]-a[1])[0];
-    return {...m, total:mc.length, active:active.length, sc, topStatus};
+    return {...m, totalItems:mc.length, activeItems:active.length, sc, topStatus};
   }),[items,modulos]);
 
   const semModulo = useMemo(()=>items.filter(i=>i.active&&getModuloId(i)==='sem-modulo'),[items]);
 
   return(<div style={{padding:20}}>
+
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
+      {[
+        ['Total módulos', modulos.length, '#1e293b'],
+        ['Cards mapeados', items.filter(i=>i.active&&getModuloId(i)!=='sem-modulo').length, '#3b82f6'],
+        ['Sem módulo', semModulo.length, '#f59e0b'],
+        ['Em andamento', modulos.filter(m=>m.status==='Em andamento').length, '#22c55e'],
+      ].map(([l,v,c])=>(
+        <div key={l} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 16px'}}>
+          <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
+          <div style={{fontSize:10.5,color:'#94a3b8',marginTop:2}}>{l}</div>
+        </div>
+      ))}
+    </div>
+
+    {/* Toggle + add button */}
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+      <div style={{display:'flex',background:'#f1f5f9',borderRadius:10,padding:3,gap:2}}>
+        <button onClick={()=>setViewMode('cards')}
+          title="Ver módulos como cards"
+          style={{padding:'5px 14px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',border:'none',
+            background:viewMode==='cards'?'#fff':'transparent',
+            color:viewMode==='cards'?'#1e293b':'#94a3b8',
+            boxShadow:viewMode==='cards'?'0 1px 4px #0001':'none',transition:'all .15s'}}>
+          Cards
+        </button>
+        <button onClick={()=>setViewMode('timeline')}
+          title="Ver linha do tempo de todos os módulos"
+          style={{padding:'5px 14px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',border:'none',
+            background:viewMode==='timeline'?'#fff':'transparent',
+            color:viewMode==='timeline'?'#1e293b':'#94a3b8',
+            boxShadow:viewMode==='timeline'?'0 1px 4px #0001':'none',transition:'all .15s'}}>
+          Timeline
+        </button>
+      </div>
+      <button onClick={()=>setEditing({})} title="Criar um novo módulo"
+        style={{padding:'7px 16px',borderRadius:8,fontSize:12,fontWeight:700,border:'none',background:'#3b82f6',color:'#fff',cursor:'pointer'}}>
+        + Novo Módulo
+      </button>
+    </div>
+
+    {/* CARDS VIEW */}
+    {viewMode==='cards'&&<>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14,marginBottom:20}}>
+      {modulosWithStats.map(m=>(
+        <ModuloCard key={m.id} m={m}
+          itemCount={m.totalItems} activeCount={m.activeItems}
+          sc={m.sc} topStatus={m.topStatus}
+          onEdit={setEditing} onDelete={onDelete} onDrillDown={onDrillDown}/>
+      ))}
+    </div>
+    {semModulo.length>0&&(
+      <div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,padding:'14px 18px'}}>
+        <div style={{fontWeight:700,fontSize:13,color:'#92400e',marginBottom:6}}>{semModulo.length} cards sem módulo associado</div>
+        <div style={{fontSize:11,color:'#78350f',lineHeight:1.6}}>Acesse o Roadmap Detalhado e use o botão "↕ módulo" para classificá-los.</div>
+      </div>
+    )}
+    </>}
+
+    {/* TIMELINE VIEW */}
+    {viewMode==='timeline'&&(
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,overflow:'hidden'}}>
+        <ModulosTimeline items={items} modulos={modulos} onDrillDown={onDrillDown}/>
+      </div>
+    )}
+
+    {editing!==null&&(
+      <ModuloEditModal modulo={editing} onSave={form=>{
+        if(form.id&&modulos.find(m=>m.id===form.id)) onUpdate(form);
+        else onAdd(form);
+        setEditing(null);
+      }} onClose={()=>setEditing(null)}/>
+    )}
+  </div>);
+}
 
     {/* Stats */}
     <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:20}}>
@@ -766,86 +1011,7 @@ function ModulosView({items, modulos, onUpdate, onAdd, onDelete, onDrillDown}){
       </button>
     </div>
 
-    {/* Module grid */}
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:14,marginBottom:20}}>
-      {modulosWithStats.map(m=>{
-        const ss = m.topStatus ? (STATUS_STYLE[m.topStatus[0]]||STATUS_STYLE['Pendente']) : null;
-        return(
-          <div key={m.id} onClick={()=>onDrillDown(m)}
-            title="Clique para ver os cards deste módulo no roadmap"
-            style={{background:'#fff',border:`1.5px solid #e2e8f0`,borderRadius:12,padding:'16px',cursor:'pointer',
-              transition:'all .15s',position:'relative'}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=m.cor;e.currentTarget.style.boxShadow=`0 4px 16px ${m.cor}25`;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor='#e2e8f0';e.currentTarget.style.boxShadow='none';}}>
-
-            {/* Header */}
-            <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:10}}>
-              <div style={{width:36,height:36,borderRadius:9,background:m.cor,color:'#fff',fontWeight:800,fontSize:14,
-                display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{m.num}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontWeight:700,fontSize:13.5,color:'#1e293b',lineHeight:1.3}}>{m.titulo}</div>
-                <div style={{fontSize:11,color:'#64748b',marginTop:2,lineHeight:1.4,
-                  display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{m.desc}</div>
-              </div>
-            </div>
-
-            {/* Stats row */}
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,flexWrap:'wrap'}}>
-              <span style={{fontSize:11,fontWeight:700,color:m.cor}}>{m.active} cards ativos</span>
-              {m.total!==m.active&&<span style={{fontSize:10,color:'#94a3b8'}}>({m.total} total)</span>}
-              {m.topStatus&&ss&&(
-                <span style={{fontSize:9.5,padding:'2px 7px',borderRadius:20,background:ss.bg,color:ss.text,
-                  display:'flex',alignItems:'center',gap:3,fontWeight:600,marginLeft:'auto'}}>
-                  <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>
-                  {m.topStatus[0]} ({m.topStatus[1]})
-                </span>
-              )}
-            </div>
-
-            {/* Progress bar */}
-            <div style={{height:4,background:'#f1f5f9',borderRadius:2,overflow:'hidden',marginBottom:10}}>
-              <div style={{height:'100%',background:m.cor,borderRadius:2,
-                width:`${Math.min(100,Math.round((m.active/Math.max(m.total,1))*100))}%`,
-                opacity:0.7,transition:'width .3s'}}/>
-            </div>
-
-            {/* Status badge */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:20,
-                background: m.status==='Em andamento'?'#f0fdf4':m.status==='Concluído'?'#eff6ff':'#f8fafc',
-                color: m.status==='Em andamento'?'#166534':m.status==='Concluído'?'#1d4ed8':'#64748b'}}>
-                {m.status}
-              </span>
-              {m.active===0&&<span title="Este módulo não tem cards associados ainda"
-                style={{fontSize:9.5,color:'#f59e0b',fontWeight:600,cursor:'help'}}>⚠ Sem cards</span>}
-            </div>
-
-            {/* Action buttons */}
-            <div style={{position:'absolute',top:10,right:10,display:'flex',gap:3,opacity:0}}
-              className="modulo-actions"
-              onMouseEnter={e=>e.currentTarget.style.opacity=1}
-              onMouseLeave={e=>e.currentTarget.style.opacity=0}>
-              <button title="Editar este módulo" onClick={e=>{e.stopPropagation();setEditing(m);}}
-                style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>✎</button>
-              <button title="Remover este módulo" onClick={e=>{e.stopPropagation();if(confirm('Remover este módulo?'))onDelete(m.id);}}
-                style={{width:22,height:22,borderRadius:5,border:'1px solid #fee2e2',background:'#fff',cursor:'pointer',fontSize:11,color:'#ef4444',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
-            </div>
-          </div>
-        );
-      })}
     </div>
-
-    {/* Sem módulo warning */}
-    {semModulo.length>0&&(
-      <div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,padding:'14px 18px'}}>
-        <div style={{fontWeight:700,fontSize:13,color:'#92400e',marginBottom:8}}>
-          {semModulo.length} cards sem módulo associado
-        </div>
-        <div style={{fontSize:11,color:'#78350f',lineHeight:1.6}}>
-          Estes cards não foram classificados automaticamente. Acesse o Roadmap Detalhado e use o botão "↕ módulo" para classificá-los.
-        </div>
-      </div>
-    )}
 
     {/* Edit modal */}
     {editing!==null&&(
