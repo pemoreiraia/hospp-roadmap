@@ -172,7 +172,7 @@ function getModuloId(item, modulosOverride){
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "4.4";
+const APP_VERSION = "4.5";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1295,6 +1295,365 @@ function MoveModuloModal({card, modulos, onMove, onClose}){
   );
 }
 
+// ─── NOVAS FUNCIONALIDADES DATA ──────────────────────────────
+const NOVAS_FUNC_INIT = [
+  {id:"nf1",  num:1,  titulo:"Market Place",                              desc:"Marketplace para compra e venda de equipamentos médicos entre hospitais e fornecedores",    cor:"#3b82f6", status:"Ideia",        startMonth:7, endMonth:12},
+  {id:"nf2",  num:2,  titulo:"Hub de Informação — Google da Saúde",       desc:"Central de informações sobre equipamentos, manutenção e boas práticas do setor de saúde",  cor:"#10b981", status:"Ideia",        startMonth:8, endMonth:12},
+  {id:"nf3",  num:3,  titulo:"Tecnovigilância",                           desc:"Monitoramento e alertas de tecnovigilância para equipamentos médicos regulados pela Anvisa",  cor:"#ef4444", status:"Ideia",        startMonth:7, endMonth:10},
+  {id:"nf4",  num:4,  titulo:"Trade In de Equipamentos",                  desc:"Programa de troca de equipamentos usados por novos com crédito na plataforma",               cor:"#f59e0b", status:"Ideia",        startMonth:9, endMonth:12},
+  {id:"nf5",  num:5,  titulo:"Mercado de Usados",                         desc:"Plataforma para compra e venda de equipamentos médicos usados com histórico de manutenção",   cor:"#8b5cf6", status:"Ideia",        startMonth:9, endMonth:12},
+  {id:"nf6",  num:6,  titulo:"Plug In de Produtividade de Equipamentos",  desc:"Análise de produtividade e utilização de equipamentos com sugestões de otimização",         cor:"#14b8a6", status:"Planejando",   startMonth:6, endMonth:9},
+  {id:"nf7",  num:7,  titulo:"Treinamento sobre os Equipamentos",         desc:"Módulo de treinamentos e certificações sobre operação e manutenção de equipamentos",         cor:"#f97316", status:"Planejando",   startMonth:7, endMonth:10},
+  {id:"nf8",  num:8,  titulo:"Agente Tutor",                              desc:"Agente de IA para tutoria e suporte contextual baseado no histórico de chamados e manuais",   cor:"#7c3aed", status:"Planejando",   startMonth:8, endMonth:12},
+  {id:"nf9",  num:9,  titulo:"Features de CMMS",                          desc:"Funcionalidades avançadas de CMMS: manutenção preditiva, gestão de peças e ordens de trabalho",cor:"#059669",status:"Em avaliação", startMonth:6, endMonth:9},
+];
+
+const NF_STATUS_COLORS = {
+  'Ideia':        {bg:'#f5f3ff',text:'#6d28d9',dot:'#8b5cf6'},
+  'Planejando':   {bg:'#fffbeb',text:'#92400e',dot:'#f59e0b'},
+  'Em avaliação': {bg:'#eff6ff',text:'#1d4ed8',dot:'#3b82f6'},
+  'Em andamento': {bg:'#f0fdf4',text:'#166534',dot:'#22c55e'},
+  'Concluído':    {bg:'#ecfdf5',text:'#065f46',dot:'#10b981'},
+  'Cancelado':    {bg:'#fef2f2',text:'#b91c1c',dot:'#ef4444'},
+};
+
+// ─── NOVAS FUNCIONALIDADES EDIT MODAL ────────────────────────
+function NFEditModal({item, onSave, onClose}){
+  const isNew=!item.id;
+  const [form,setForm]=useState({titulo:'',desc:'',cor:'#3b82f6',status:'Ideia',startMonth:CURRENT_MONTH,endMonth:Math.min(12,CURRENT_MONTH+2),...item});
+  const CORES=['#3b82f6','#8b5cf6','#f59e0b','#10b981','#ec4899','#14b8a6','#f97316','#6366f1','#0891b2','#7c3aed','#059669','#dc2626','#64748b'];
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
+  return(
+    <div style={{position:'fixed',inset:0,background:'#00000066',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:500,maxHeight:'90vh',overflow:'auto',boxShadow:'0 20px 60px #0003'}}>
+        <div style={{padding:'18px 22px 14px',borderBottom:'1px solid #f1f5f9',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <h2 style={{fontSize:15,fontWeight:800,color:'#1e293b',margin:0}}>{isNew?'Nova Funcionalidade':'Editar Funcionalidade'}</h2>
+          <button onClick={onClose} style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:'#94a3b8'}}>×</button>
+        </div>
+        <div style={{padding:'16px 22px',display:'flex',flexDirection:'column',gap:12}}>
+          <div>
+            <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Título *</label>
+            <input value={form.titulo} onChange={e=>set('titulo',e.target.value)}
+              style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 11px',fontSize:13,outline:'none'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Descrição</label>
+            <textarea value={form.desc} onChange={e=>set('desc',e.target.value)} rows={2}
+              style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'7px 11px',fontSize:13,outline:'none',resize:'vertical'}}/>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Status</label>
+              <select value={form.status} onChange={e=>set('status',e.target.value)}
+                style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'6px 9px',fontSize:11}}>
+                {Object.keys(NF_STATUS_COLORS).map(s=><option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Início</label>
+              <select value={form.startMonth} onChange={e=>set('startMonth',Number(e.target.value))}
+                style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'6px 9px',fontSize:11}}>
+                {MONTHS.map((m,i)=><option key={i} value={i+1}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:3}}>Fim</label>
+              <select value={form.endMonth} onChange={e=>set('endMonth',Number(e.target.value))}
+                style={{width:'100%',border:'1.5px solid #e2e8f0',borderRadius:8,padding:'6px 9px',fontSize:11}}>
+                {MONTHS.map((m,i)=><option key={i} value={i+1}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style={{fontSize:10,fontWeight:700,color:'#64748b',textTransform:'uppercase',display:'block',marginBottom:5}}>Cor</label>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+              {CORES.map(c=>(
+                <div key={c} onClick={()=>set('cor',c)}
+                  style={{width:22,height:22,borderRadius:5,background:c,cursor:'pointer',
+                    outline:form.cor===c?`2px solid ${c}`:'2px solid transparent',outlineOffset:2,transition:'outline .1s'}}/>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{padding:'10px 22px 18px',display:'flex',justifyContent:'flex-end',gap:8,borderTop:'1px solid #f1f5f9'}}>
+          <button onClick={onClose} style={{padding:'7px 16px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#64748b',fontWeight:600,cursor:'pointer',fontSize:12}}>Cancelar</button>
+          <button onClick={()=>{if(!form.titulo.trim())return alert('Título obrigatório');onSave(form);}}
+            style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#3b82f6',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:12}}>
+            {isNew?'Criar':'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── GENERIC TIMELINE (reused by Prioridades + Novas Func) ───
+function GenericTimeline({rows, onDrillDown, labelKey='titulo', colorKey='cor', numKey='num', extraLabel}){
+  const COL=76, LBL=280;
+  return(
+    <div style={{overflowX:'auto',maxHeight:'calc(100vh - 300px)'}}>
+      <div style={{minWidth:LBL+COL*12}}>
+        <div style={{display:'grid',gridTemplateColumns:`${LBL}px repeat(12,${COL}px)`,
+          background:'#f8fafc',borderBottom:'2px solid #e2e8f0',position:'sticky',top:0,zIndex:5}}>
+          <div style={{padding:'10px 16px',fontSize:10,fontWeight:700,color:'#94a3b8',
+            textTransform:'uppercase',borderRight:'1px solid #e2e8f0'}}>
+            Iniciativa — {new Date().getFullYear()}
+          </div>
+          {MONTHS.map((m,i)=>(
+            <div key={m} style={{padding:'10px 4px',textAlign:'center',fontSize:10,fontWeight:700,
+              borderRight:'1px solid #e2e8f0',
+              color:i+1===CURRENT_MONTH?'#3b82f6':'#94a3b8',
+              background:i+1===CURRENT_MONTH?'#eff6ff':undefined}}>
+              {m}{i+1===CURRENT_MONTH&&<div style={{width:4,height:4,background:'#3b82f6',borderRadius:'50%',margin:'2px auto 0'}}/>}
+            </div>
+          ))}
+        </div>
+        {rows.map(row=>{
+          const cor=row[colorKey]||'#94a3b8';
+          const s=row.startMonth||CURRENT_MONTH, e=row.endMonth||s;
+          return(
+            <div key={row.id} onClick={()=>onDrillDown&&onDrillDown(row)}
+              style={{display:'grid',gridTemplateColumns:`${LBL}px repeat(12,${COL}px)`,
+                borderBottom:'1px solid #f1f5f9',minHeight:54,cursor:onDrillDown?'pointer':'default',
+                background:'#fff',transition:'background .1s'}}
+              onMouseEnter={ev=>{if(onDrillDown)ev.currentTarget.style.background=`${cor}06`;}}
+              onMouseLeave={ev=>ev.currentTarget.style.background='#fff'}>
+              <div style={{padding:'8px 14px',borderRight:'1px solid #e2e8f0',display:'flex',flexDirection:'column',justifyContent:'center',gap:4}}>
+                <div style={{display:'flex',alignItems:'center',gap:7}}>
+                  {row[numKey]&&<span style={{width:20,height:20,borderRadius:5,background:cor,color:'#fff',
+                    fontWeight:800,fontSize:9,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{row[numKey]}</span>}
+                  <span style={{fontSize:12,fontWeight:600,color:'#1e293b',lineHeight:1.3,
+                    display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{row[labelKey]}</span>
+                </div>
+                {extraLabel&&extraLabel(row)}
+              </div>
+              {MONTHS.map((_,mi)=>{
+                const mo=mi+1, active=mo>=s&&mo<=e, isS=mo===s, isE=mo===e;
+                return(
+                  <div key={mi} style={{borderRight:'1px solid #f1f5f9',display:'flex',alignItems:'center',padding:'0 3px',
+                    background:mi+1===CURRENT_MONTH?`${cor}06`:undefined}}>
+                    {active&&<div title={`${row[labelKey]}: ${MONTHS[s-1]}${e>s?'–'+MONTHS[e-1]:''}`}
+                      style={{height:28,width:'100%',background:cor,opacity:0.85,position:'relative',
+                        borderRadius:`${isS?'7px':'0'} ${isE?'7px':'0'} ${isE?'7px':'0'} ${isS?'7px':'0'}`,
+                        marginLeft:isS?3:0,marginRight:isE?3:0,boxShadow:`0 1px 4px ${cor}40`}}>
+                      {isS&&<span style={{position:'absolute',left:7,top:'50%',transform:'translateY(-50%)',
+                        fontSize:8,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',pointerEvents:'none'}}>
+                        {e>s?`${MONTHS[s-1]}–${MONTHS[e-1]}`:MONTHS[s-1]}
+                      </span>}
+                    </div>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        {rows.length===0&&<div style={{textAlign:'center',padding:'48px 0',color:'#94a3b8',fontSize:13}}>Nenhum item para exibir</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── PRIORIDADES VIEW ────────────────────────────────────────
+function PrioridadesView({items}){
+  const [viewMode, setViewMode] = useState('cards');
+  const [removidos, setRemovidos] = useState([]);
+
+  const priorityItems = useMemo(()=>
+    items.filter(i=>i.priority==='high'&&i.active&&!removidos.includes(i.id))
+  ,[items, removidos]);
+
+  return(<div style={{padding:20}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
+      {[
+        ['Cards prioritários', priorityItems.length, '#ef4444'],
+        ['Validar Publicado', priorityItems.filter(i=>i.status==='Validar no Publicado').length, '#f97316'],
+        ['Em andamento', priorityItems.filter(i=>['Em andamento','Em teste'].includes(i.status)).length, '#22c55e'],
+      ].map(([l,v,c])=>(
+        <div key={l} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 16px'}}>
+          <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
+          <div style={{fontSize:10.5,color:'#94a3b8',marginTop:2}}>{l}</div>
+        </div>
+      ))}
+    </div>
+
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+      <div style={{display:'flex',background:'#f1f5f9',borderRadius:10,padding:3,gap:2}}>
+        {[['cards','Cards'],['timeline','Timeline']].map(([v,l])=>(
+          <button key={v} onClick={()=>setViewMode(v)}
+            style={{padding:'5px 14px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',border:'none',
+              background:viewMode===v?'#fff':'transparent',color:viewMode===v?'#1e293b':'#94a3b8',
+              boxShadow:viewMode===v?'0 1px 4px #0001':'none',transition:'all .15s'}}>{l}</button>
+        ))}
+      </div>
+      <span style={{fontSize:11,color:'#94a3b8'}}>{priorityItems.length} cards prioritários do Trello</span>
+    </div>
+
+    {viewMode==='cards'&&(
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:12}}>
+        {priorityItems.map(item=>{
+          const ss=STATUS_STYLE[item.status]||STATUS_STYLE['Pendente'];
+          const fc=FEATURE_COLORS[item.feature]||FEATURE_COLORS['Outros'];
+          return(
+            <PrioCard key={item.id} item={item} ss={ss} fc={fc} onRemove={()=>setRemovidos(p=>[...p,item.id])}/>
+          );
+        })}
+        {priorityItems.length===0&&<div style={{gridColumn:'1/-1',textAlign:'center',padding:'40px',color:'#94a3b8',fontSize:13}}>
+          Nenhum card prioritário ativo encontrado
+        </div>}
+      </div>
+    )}
+
+    {viewMode==='timeline'&&(
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,overflow:'hidden'}}>
+        <GenericTimeline
+          rows={priorityItems.map(i=>({...i,cor:FEATURE_COLORS[i.feature]?.bar||'#ef4444'}))}
+          labelKey="title" colorKey="cor" numKey={null}
+          extraLabel={item=>{
+            const ss=STATUS_STYLE[item.status]||STATUS_STYLE['Pendente'];
+            return <span style={{fontSize:9,padding:'1px 5px',borderRadius:20,background:ss.bg,color:ss.text,
+              display:'inline-flex',alignItems:'center',gap:2,marginLeft:0}}>
+              <span style={{width:3,height:3,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{item.status}
+            </span>;
+          }}
+        />
+      </div>
+    )}
+  </div>);
+}
+
+function PrioCard({item, ss, fc, onRemove}){
+  const [hov,setHov]=useState(false);
+  return(
+    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{background:'#fff',border:`1.5px solid ${hov?'#ef4444':'#e2e8f0'}`,borderRadius:12,padding:'14px',
+        position:'relative',transition:'all .15s',boxShadow:hov?'0 4px 16px #ef444420':'none'}}>
+      <div style={{display:'flex',gap:8,marginBottom:8}}>
+        <div style={{width:8,height:8,borderRadius:'50%',background:'#ef4444',marginTop:5,flexShrink:0}}/>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:12.5,fontWeight:600,color:'#1e293b',lineHeight:1.4,
+            display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{item.title}</div>
+          {item.desc&&<div style={{fontSize:10.5,color:'#94a3b8',marginTop:3,lineHeight:1.4,
+            display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{item.desc}</div>}
+        </div>
+      </div>
+      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:6}}>
+        <span style={{fontSize:9,fontWeight:700,padding:'1px 6px',borderRadius:20,background:ss.bg,color:ss.text,
+          display:'flex',alignItems:'center',gap:2}}>
+          <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{item.status}
+        </span>
+        <span style={{fontSize:9,padding:'1px 6px',borderRadius:20,background:fc.soft,color:fc.text,fontWeight:600}}>{item.feature}</span>
+        {item.dueDate&&<span style={{fontSize:9,color:'#f59e0b',fontWeight:600}}>📅 {item.dueDate}</span>}
+      </div>
+      <div style={{display:'flex',gap:5,alignItems:'center'}}>
+        <span style={{fontSize:10,color:'#94a3b8'}}>{MONTHS[item.startMonth-1]}{item.endMonth>item.startMonth?`–${MONTHS[item.endMonth-1]}`:''}</span>
+        {item.url&&<a href={item.url} target="_blank" rel="noreferrer"
+          style={{fontSize:9,padding:'1px 7px',borderRadius:20,border:'1px solid #e2e8f0',background:'#fff',
+            color:'#64748b',textDecoration:'none',fontWeight:600,marginLeft:'auto'}}>↗ Trello</a>}
+      </div>
+      <div style={{position:'absolute',top:8,right:8,display:'flex',gap:3,opacity:hov?1:0,transition:'opacity .15s'}}>
+        <button title="Remover da lista de prioridades" onClick={onRemove}
+          style={{width:20,height:20,borderRadius:5,border:'1px solid #fee2e2',background:'#fff',
+            cursor:'pointer',fontSize:10,color:'#ef4444',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── NOVAS FUNCIONALIDADES VIEW ──────────────────────────────
+function NovasFuncView({items, onUpdate, onAdd, onDelete}){
+  const [viewMode, setViewMode] = useState('cards');
+  const [editing, setEditing] = useState(null);
+
+  return(<div style={{padding:20}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
+      {[
+        ['Total', items.length, '#1e293b'],
+        ['Ideias', items.filter(i=>i.status==='Ideia').length, '#8b5cf6'],
+        ['Planejando', items.filter(i=>i.status==='Planejando').length, '#f59e0b'],
+        ['Em avaliação', items.filter(i=>i.status==='Em avaliação').length, '#3b82f6'],
+      ].map(([l,v,c])=>(
+        <div key={l} style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:10,padding:'12px 16px'}}>
+          <div style={{fontSize:22,fontWeight:800,color:c}}>{v}</div>
+          <div style={{fontSize:10.5,color:'#94a3b8',marginTop:2}}>{l}</div>
+        </div>
+      ))}
+    </div>
+
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+      <div style={{display:'flex',background:'#f1f5f9',borderRadius:10,padding:3,gap:2}}>
+        {[['cards','Cards'],['timeline','Timeline']].map(([v,l])=>(
+          <button key={v} onClick={()=>setViewMode(v)}
+            style={{padding:'5px 14px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',border:'none',
+              background:viewMode===v?'#fff':'transparent',color:viewMode===v?'#1e293b':'#94a3b8',
+              boxShadow:viewMode===v?'0 1px 4px #0001':'none',transition:'all .15s'}}>{l}</button>
+        ))}
+      </div>
+      <button onClick={()=>setEditing({})} title="Adicionar nova funcionalidade"
+        style={{padding:'7px 16px',borderRadius:8,fontSize:12,fontWeight:700,border:'none',background:'#3b82f6',color:'#fff',cursor:'pointer'}}>
+        + Nova Funcionalidade
+      </button>
+    </div>
+
+    {viewMode==='cards'&&(
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:12}}>
+        {items.map(item=><NFCard key={item.id} item={item} onEdit={()=>setEditing(item)} onDelete={()=>onDelete(item.id)}/>)}
+      </div>
+    )}
+
+    {viewMode==='timeline'&&(
+      <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:12,overflow:'hidden'}}>
+        <GenericTimeline rows={items} labelKey="titulo" colorKey="cor" numKey="num"
+          extraLabel={item=>{
+            const ss=NF_STATUS_COLORS[item.status]||NF_STATUS_COLORS['Ideia'];
+            return <span style={{fontSize:9,padding:'1px 5px',borderRadius:20,background:ss.bg,color:ss.text,fontWeight:600}}>{item.status}</span>;
+          }}
+        />
+      </div>
+    )}
+
+    {editing!==null&&<NFEditModal item={editing} onSave={form=>{
+      if(form.id&&items.find(i=>i.id===form.id)) onUpdate(form);
+      else onAdd(form);
+      setEditing(null);
+    }} onClose={()=>setEditing(null)}/>}
+  </div>);
+}
+
+function NFCard({item, onEdit, onDelete}){
+  const [hov,setHov]=useState(false);
+  const ss=NF_STATUS_COLORS[item.status]||NF_STATUS_COLORS['Ideia'];
+  return(
+    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+      style={{background:'#fff',border:`1.5px solid ${hov?item.cor:'#e2e8f0'}`,borderRadius:12,padding:'16px',
+        position:'relative',transition:'all .15s',boxShadow:hov?`0 4px 16px ${item.cor}25`:'none'}}>
+      <div style={{display:'flex',gap:10,marginBottom:10}}>
+        <div style={{width:34,height:34,borderRadius:9,background:item.cor,color:'#fff',fontWeight:800,fontSize:13,
+          display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{item.num}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:700,color:'#1e293b',lineHeight:1.3}}>{item.titulo}</div>
+          <div style={{fontSize:11,color:'#64748b',marginTop:2,lineHeight:1.4,
+            display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{item.desc}</div>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:5,alignItems:'center',flexWrap:'wrap'}}>
+        <span style={{fontSize:9.5,fontWeight:700,padding:'2px 7px',borderRadius:20,
+          background:ss.bg,color:ss.text,display:'flex',alignItems:'center',gap:3}}>
+          <span style={{width:4,height:4,borderRadius:'50%',background:ss.dot,display:'inline-block'}}/>{item.status}
+        </span>
+        <span style={{fontSize:10,color:'#94a3b8',marginLeft:'auto'}}>
+          {MONTHS[item.startMonth-1]}{item.endMonth>item.startMonth?`–${MONTHS[item.endMonth-1]}`:''} {new Date().getFullYear()}
+        </span>
+      </div>
+      <div style={{position:'absolute',top:10,right:10,display:'flex',gap:3,opacity:hov?1:0,transition:'opacity .15s'}}>
+        <button title="Editar" onClick={onEdit}
+          style={{width:22,height:22,borderRadius:5,border:'1px solid #e2e8f0',background:'#fff',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>✎</button>
+        <button title="Remover" onClick={()=>{if(confirm('Remover esta funcionalidade?'))onDelete();}}
+          style={{width:22,height:22,borderRadius:5,border:'1px solid #fee2e2',background:'#fff',cursor:'pointer',fontSize:11,color:'#ef4444',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── IMPORT SCREEN ───────────────────────────────────────────
 function ImportScreen({onImport, onRestore}){
   const [drag,setDrag]=useState(false);
@@ -1399,11 +1758,12 @@ function ImportScreen({onImport, onRestore}){
 
 // ─── MAIN APP ────────────────────────────────────────────────
 function App(){
-  const [frentes,setFrentesRaw]  =useState(()=>LS.get('hospp:frentes',FRENTES_INIT));
-  const [modulos,setModulosRaw]  =useState(()=>LS.get('hospp:modulos',MODULOS_INIT));
+  const [frentes,setFrentesRaw]   =useState(()=>LS.get('hospp:frentes',FRENTES_INIT));
+  const [modulos,setModulosRaw]   =useState(()=>LS.get('hospp:modulos',MODULOS_INIT));
+  const [novasFuncs,setNFRaw]     =useState(()=>LS.get('hospp:novasfuncs',NOVAS_FUNC_INIT));
   const [trelloItems,setTrelloRaw]=useState(()=>LS.get('hospp:trello',[]));
-  const [overlay,setOverlayRaw]  =useState(()=>LS.get('hospp:overlay',{}));
-  const [boardName,setBoardName] =useState(()=>LS.get('hospp:boardName',null));
+  const [overlay,setOverlayRaw]   =useState(()=>LS.get('hospp:overlay',{}));
+  const [boardName,setBoardName]  =useState(()=>LS.get('hospp:boardName',null));
 
   const [tab,setTab]=useState('frentes');
   const [showDeps,setShowDeps]=useState(true);
@@ -1425,6 +1785,7 @@ function App(){
 
   const setFreentes=v=>{setFrentesRaw(v);LS.set('hospp:frentes',v);};
   const setModulos=v=>{setModulosRaw(v);LS.set('hospp:modulos',v);};
+  const setNovasFuncs=v=>{setNFRaw(v);LS.set('hospp:novasfuncs',v);};
   const setOverlay=v=>{setOverlayRaw(v);LS.set('hospp:overlay',v);};
 
   const patchItem=useCallback((id,patch)=>{
@@ -1455,7 +1816,7 @@ function App(){
   };
 
   const saveState=()=>{
-    const data={version:'3.7',savedAt:new Date().toISOString(),trelloItems,overlay,frentes,modulos,boardName};
+    const data={version:'4.5',savedAt:new Date().toISOString(),trelloItems,overlay,frentes,modulos,novasFuncs,boardName};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;
@@ -1475,6 +1836,7 @@ function App(){
         if(d.overlay){setOverlay(d.overlay);}
         if(d.frentes){setFreentes(d.frentes);}
         if(d.modulos){setModulos(d.modulos);}
+        if(d.novasFuncs){setNovasFuncs(d.novasFuncs);}
         if(d.boardName){setBoardName(d.boardName);LS.set('hospp:boardName',d.boardName);}
         alert('Estado restaurado com sucesso!');
       }catch{alert('Arquivo inválido.');}
@@ -1567,7 +1929,13 @@ function App(){
 
     {/* TABS */}
     <div style={{background:'#fff',borderBottom:'1px solid #e2e8f0',padding:'0 20px',display:'flex',gap:0}}>
-      {[['frentes',`Frentes (${frentes.length})`],['modulos',`Módulos (${modulos.length})`],['roadmap',`Roadmap — ${boardName||'Trello'} (${roadmapItems.length}/${allItems.length})`]].map(([id,lbl])=>(
+      {[
+        ['frentes',`Frentes (${frentes.length})`],
+        ['modulos',`Módulos (${modulos.length})`],
+        ['prioridades',`Prioridades (${allItems.filter(i=>i.priority==='high'&&i.active).length})`],
+        ['novasfunc',`Novas Funcionalidades (${novasFuncs.length})`],
+        ['roadmap',`Roadmap — ${boardName||'Trello'} (${roadmapItems.length}/${allItems.length})`],
+      ].map(([id,lbl])=>(
         <button key={id} onClick={()=>setTab(id)} style={{padding:'10px 16px',fontSize:12,fontWeight:700,border:'none',borderBottom:`2px solid ${tab===id?'#3b82f6':'transparent'}`,background:'none',color:tab===id?'#3b82f6':'#94a3b8',cursor:'pointer',transition:'color .15s'}}>{lbl}</button>
       ))}
     </div>
@@ -1613,6 +1981,17 @@ function App(){
       onAdd={m=>{const mx=Math.max(...modulos.map(x=>x.num),0);setModulos([...modulos,{...m,id:`m${Date.now()}`,num:mx+1}]);}}
       onDelete={id=>setModulos(modulos.filter(m=>m.id!==id))}
       onDrillDown={openRoadmapFromModulo}
+    />}
+
+    {/* PRIORIDADES TAB */}
+    {tab==='prioridades'&&<PrioridadesView items={allItems}/>}
+
+    {/* NOVAS FUNCIONALIDADES TAB */}
+    {tab==='novasfunc'&&<NovasFuncView
+      items={novasFuncs}
+      onUpdate={f=>setNovasFuncs(novasFuncs.map(x=>x.id===f.id?f:x))}
+      onAdd={f=>{const mx=Math.max(...novasFuncs.map(x=>x.num),0);setNovasFuncs([...novasFuncs,{...f,id:`nf${Date.now()}`,num:mx+1}]);}}
+      onDelete={id=>setNovasFuncs(novasFuncs.filter(f=>f.id!==id))}
     />}
 
     {/* ROADMAP TAB */}
