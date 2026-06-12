@@ -172,7 +172,7 @@ function getModuloId(item, modulosOverride){
 const PRIOR_S={ALTA:{bg:"#fee2e2",text:"#b91c1c"},MEDIA:{bg:"#fef9c3",text:"#854d0e"},BAIXA:{bg:"#f0fdf4",text:"#166534"}};
 
 // ─── STORAGE ─────────────────────────────────────────────────
-const APP_VERSION = "4.6";
+const APP_VERSION = "4.6.1";
 const LS={
   get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
   set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
@@ -1006,7 +1006,6 @@ function ModulosView({items, modulos, onUpdate, onAdd, onDelete, onDrillDown}){
       {filteredModulos.length===0&&<div style={{gridColumn:'1/-1',textAlign:'center',padding:'40px',color:'#94a3b8',fontSize:13}}>
         Nenhum módulo encontrado para este filtro
       </div>}
-    </div>
     </div>
     {semModulo.length>0&&(
       <div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:10,padding:'14px 18px'}}>
